@@ -13,6 +13,22 @@ Use `nysos --version` or `--version-full` for build and Git information;
 
 ## Quick start
 
+Install with Homebrew on macOS or Linux:
+
+```sh
+brew install mccodeman/tap/nysos
+nysos --init demo.toml
+nysos --config demo.toml
+```
+
+The [Homebrew tap](https://github.com/McCodeman/homebrew-tap) builds from source
+using Homebrew's Rust dependency; Nix is not required. It also installs
+`man nysos`. To update, run `brew update && brew upgrade nysos`.
+For optional Bash and Zsh completions, run `nysos --install-completions` and
+reopen your terminal.
+
+### Build from source
+
 Install [Nix](https://nixos.org/download/), then use the locked toolchain:
 
 ```sh

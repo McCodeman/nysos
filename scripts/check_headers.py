@@ -26,7 +26,10 @@ for path in ROOT.rglob('*'):
         continue
     if path.suffix not in EXTENSIONS and path.name not in SPECIAL:
         continue
-    header = path.read_text()[:1024]
+    # Release Please prepends notes above the changelog's retained license notice.
+    # Keep the header-position requirement for source and hand-written docs.
+    content = path.read_text()
+    header = content if relative == Path('CHANGELOG.md') else content[:1024]
     if COPYRIGHT not in header or 'SPDX-License-Identifier: Apache-2.0' not in header:
         errors.append(str(relative))
     checked += 1

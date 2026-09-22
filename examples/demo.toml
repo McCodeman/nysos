@@ -1,0 +1,41 @@
+# Pane count is the number of [[panes]] entries (1–16).
+header = true
+cue_list = true
+cue_width = 26
+layout = "columns" # columns, rows, grid
+
+[[panes]]
+name = "presenter"
+shell = "/bin/zsh"
+args = ["-l"]
+scheme = "ocean" # ocean, ember, forest, mono
+weight = 3
+
+[[panes]]
+name = "observer"
+shell = "/bin/sh"
+scheme = "ember"
+weight = 2
+
+[[queues]]
+name = "Introductions"
+description = "Run each command with Ctrl-B, n; skip with Ctrl-B, s."
+commands = [
+  { pane = "presenter", command = "printf '\\033[1;36mWelcome to nysos\\033[0m\\n'" },
+  { pane = "observer", command = "printf 'An independent interactive shell\\n'; pwd" },
+]
+
+[[queues]]
+name = "Explore"
+description = "Edit this item with Ctrl-B, e before executing it."
+commands = [
+  { pane = "presenter", command = "ls -lah" },
+  { pane = "observer", command = "printf 'Docs: https://ratatui.rs\\n'" },
+]
+
+[[queues]]
+name = "Ad hoc"
+description = "Ctrl-B, a adds a pane. Click or Alt-arrow to focus."
+commands = [
+  { pane = "presenter", command = "printf 'Try an interactive program, then return to its shell prompt.\\n'" },
+]

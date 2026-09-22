@@ -1,0 +1,23 @@
+/target/
+/demo.toml
+.nysos-*.tmp
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.env
+.env.*
+!.env.example
+
+# Documentation environment and generated site
+/.venv/
+/site/
+/.cache/
+__pycache__/
+
+# Nix build outputs and optional direnv state
+/result
+/result-*
+/.direnv/

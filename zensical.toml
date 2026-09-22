@@ -1,0 +1,31 @@
+[project]
+site_name = "nysos"
+site_description = "User guide and reference for multi-pane CLI demonstrations"
+docs_dir = "docs"
+site_dir = "site"
+# Set site_url when choosing a public hosting location.
+nav = [
+  { "Home" = "index.md" },
+  { "User guide" = [
+    { "Getting started" = "guide/getting-started.md" },
+    { "PATH and completions" = "guide/shell-setup.md" },
+    { "Presenting a demo" = "guide/presenting.md" },
+    { "Controls and mouse" = "guide/controls.md" },
+    { "Editing and saving" = "guide/editor.md" },
+    { "Troubleshooting" = "guide/troubleshooting.md" },
+  ] },
+  { "Reference" = [
+    { "Demo configuration" = "reference/configuration.md" },
+    { "Command line" = "reference/cli.md" },
+    { "Manual page" = "reference/manpage.md" },
+  ] },
+  { "Development" = "development.md" },
+]
+
+[project.theme]
+language = "en"
+features = ["navigation.sections", "navigation.footer", "content.code.copy"]
+
+[project.theme.font]
+text = ""
+code = ""

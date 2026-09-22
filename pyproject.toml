@@ -1,0 +1,9 @@
+[project]
+name = "nysos-docs"
+version = "0.1.0"
+description = "Documentation tooling for nysos"
+requires-python = ">=3.11"
+dependencies = ["zensical"]
+
+[tool.uv]
+package = false

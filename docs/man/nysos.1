@@ -1,0 +1,269 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH NYSOS 1 2026-09-21 "nysos 0.1.0" "User Commands"
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH NAME
+nysos \- Multi\-pane scripted and interactive terminal demonstrations
+.SH SYNOPSIS
+.B nysos
+.RI [ OPTIONS ]
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH DESCRIPTION
+Run named, interactive shell panes alongside a manually advanced command
+queue.
+Configure layouts, colors, shells, and commands in a TOML demo file.
+Loading a demo never automatically executes its queued commands.
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH OPTIONS
+.TP
+\fB\-\-version\-full\fR
+Print full version, Git metadata, compiler, target, and build profile
+.TP
+\fB\-c\fR, \fB\-\-config\fR \fI<PATH>\fR
+Load a demo TOML file instead of the built\-in example. No file is loaded
+automatically, including demo.toml. Relative paths resolve from the launch
+directory.
+.TP
+\fB\-\-check\fR
+Validate TOML syntax, pane count, names, weights, and command targets without
+spawning shells. With no \-\-config, checks the built\-in demo. Does not
+verify shell paths, working directories, or command syntax.
+.TP
+\fB\-\-init\fR \fI<PATH>\fR
+Write a starter demo using $SHELL (or /bin/sh) and exit. The destination must
+not exist and its parent directory must already exist. Cannot be combined with
+\-\-config or \-\-check.
+.TP
+\fB\-\-add\-to\-path\fR [\fI<SHELL>\fR]
+Add the running binary\*(Aqs directory to PATH for bash, zsh, or both
+(default: all). Updates marked blocks in user startup files, preserves other
+content, and backs up existing files. Use \-\-bin\-dir to select a stable
+installation directory. Does not copy the executable or alter the current
+shell.
+.sp
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+bash
+.IP \(bu 2
+zsh
+.IP \(bu 2
+all
+.RE
+.TP
+\fB\-\-bin\-dir\fR \fI<DIR>\fR
+Directory containing nysos to add to PATH
+.TP
+\fB\-\-install\-completions\fR [\fI<SHELL>\fR]
+Install bash, zsh, or both completion scripts (default: all) under
+$XDG_DATA_HOME/nysos/completions, falling back to ~/.local/share. Updates user
+startup files to load them; respects ZDOTDIR. Safe to repeat. Can be combined
+with \-\-add\-to\-path. Open a new terminal afterward.
+.sp
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+bash
+.IP \(bu 2
+zsh
+.IP \(bu 2
+all
+.RE
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+Print version
+.SH EXAMPLES
+.TP
+.B nysos
+Start the built-in two-pane demo using SHELL, or /bin/sh.
+.TP
+.B nysos \-\-init demo.toml
+Create a starter file without overwriting an existing file.
+.TP
+.B nysos \-\-config demo.toml \-\-check
+Validate configuration without spawning shells or executing commands.
+.TP
+.B nysos \-\-config demo.toml
+Start a saved demonstration. Commands run only when manually advanced.
+.TP
+.B nysos \-\-add-to-path \-\-install-completions
+Configure PATH and completions for both Bash and Zsh, then exit.
+.SH SHELL SETUP
+The --add-to-path and --install-completions options accept bash, zsh, or all;
+omitting the value selects all. They can be combined with each other, but not
+with --config, --check, or --init. Open a new terminal after installation.
+.PP
+PATH setup uses the running executable's directory. It does not copy the
+binary.
+Use --bin-dir DIR to select a stable directory containing nysos, especially
+with
+versioned Nix store paths or profile symlinks. PATH entries are not
+duplicated.
+.PP
+Bash setup updates .bashrc and the first existing .bash_profile, .bash_login,
+or .profile, creating .profile only if none exists. Zsh PATH setup updates
+\&.zprofile and .zshrc under ZDOTDIR, or HOME when ZDOTDIR is unset.
+Completions
+are loaded only for interactive shells; Zsh initializes compinit if needed.
+.PP
+Scripts are written under XDG_DATA_HOME/nysos/completions, falling back to
+HOME/.local/share/nysos/completions: nysos.bash and _nysos. Rerun completion
+installation after upgrading the binary.
+.PP
+Startup blocks are marked with nysos comments and updated in place. Existing
+files get a .nysos.bak backup, which is never overwritten. Symlink targets are
+updated while links are preserved. Each file replacement is atomic; the
+overall
+multi-file installation is not. Output reports updated and unchanged files.
+Remove the marked blocks and generated scripts to undo shell setup.
+.SH INTERACTIVE CONTROLS
+Press Ctrl-B, release, then one of the following keys.
+.TP
+.B n, Enter
+Send the next command to its target pane and advance.
+.TP
+.B s
+Skip the next command.
+.TP
+.B e
+Edit the current queue item. Applying rewinds that item without executing it.
+.TP
+.B o
+Open the full configuration editor. Ctrl-L loads a preview; Ctrl-S saves and
+applies; Ctrl-G applies without saving; Esc cancels. F2, F3, and F4 are
+aliases.
+Applying a full demo resets queue progress. Matching shell sessions are
+reused.
+.TP
+.B a
+Add and focus an ad hoc shell pane, up to 16 panes total.
+.TP
+.B Tab, Right / Shift-Tab, Left
+Focus the next / previous pane. Keys 1 through 9 select a pane directly.
+.TP
+.B 0, c
+Show and focus the cue list, or toggle its visibility, respectively.
+.TP
+.B l, h
+Cycle the layout or toggle the header, respectively.
+.TP
+.B x
+Restart the focused shell, ending its current session.
+.TP
+.B ?, q
+Show help or quit, respectively. Esc closes help.
+.PP
+In the cue list, Up/Down selects, Enter sends the selected cue, and e edits
+it.
+Home/End and Page Up/Down browse; the wheel scrolls the list. Click selects
+without executing. Esc returns to the previous shell. Enter resumes the
+current
+partially sent cue or replays an earlier cue. Commands are sent in order
+without
+waiting for completion. Selection advances, staying on the last cue at the
+end;
+Enter on the completed last cue replays it. Ctrl-B n still sends one command.
+.PP
+Without the prefix, normal input and Ctrl-C go to the focused shell.
+Alt-Left/Right rotates focus. Click to focus; drag shared borders to resize.
+Grid row heights remain equal. Wheel events scroll history or reach
+applications
+requesting mouse input; Shift-wheel requests history when forwarded by the
+host.
+.PP
+Cmd-click opens HTTP(S) links locally on macOS when the terminal forwards the
+click. Alt-click is the portable fallback. Plain URLs spanning rows are not
+joined.
+.SH CONFIGURATION
+Demo files use TOML. No file is automatically discovered. The top-level fields
+are header (boolean, default true), cue_list (boolean, default true),
+cue_width (16 to 60 columns, default 26, capped at half the available width),
+layout (columns, rows, or grid), panes, and
+queues. Omitted panes and queues independently retain the built-in defaults.
+Use queues = [] for an interactive-only demo with custom panes.
+.PP
+Each pane table has name (unique title/identity), shell, args, optional cwd,
+scheme (ocean, ember, forest, mono), and weight (1 to 1000). There must be 1
+to 16
+panes. The shell defaults to SHELL or /bin/sh; args defaults to an empty
+array;
+name defaults to shell; scheme defaults to ocean; weight defaults to 1.
+.PP
+Each queue table requires a nonempty name and one or more commands, with an
+optional description. Each command requires pane (an existing pane name) and
+command (nonempty single-line input, with no NUL, CR, or LF).
+.PP
+Paths are relative to the launch directory; configured paths do not expand
+shell variables or tilde. The --check option validates structure and
+references,
+not executable paths, directories, command syntax, or service availability.
+.SH ENVIRONMENT
+.TP
+.B SHELL
+Default shell executable for panes that omit shell and for generated starter
+files.
+Falls back to /bin/sh when unavailable.
+.TP
+.B TERM, COLORTERM
+Child PTYs receive xterm-256color and truecolor, respectively.
+.TP
+.B SSH_CONNECTION, SSH_TTY
+If either is present, local macOS Command-key sampling is disabled.
+.TP
+.B HOME, ZDOTDIR, XDG_DATA_HOME
+Control the user shell installation locations. HOME must be absolute.
+A relative XDG_DATA_HOME is ignored; relative ZDOTDIR resolves from the launch
+working directory.
+.SH FILES
+.TP
+.B demo.toml
+Initial save-path suggestion for the built-in demo. Not loaded automatically.
+.TP
+.B docs/reference/configuration.md
+Complete configuration reference in the source distribution.
+.SH EXIT STATUS
+.TP
+.B 0
+Success, including help, version, initialization, validation, or normal exit.
+.TP
+.B 1
+Configuration, file, PTY, or runtime failure.
+.TP
+.B 2
+Invalid command-line arguments.
+.SH NOTES
+Each advance sends one command plus Enter to the target pane's current
+foreground
+program. Wait for a shell prompt; there is no completion detection or
+scheduler.
+Changing a pane's name, shell, args, or cwd starts a replacement session.
+Closing panes signals their shells; deliberately detached jobs may outlive
+them.
+.PP
+macOS is the primary platform, Linux secondary. Native Windows interaction is
+deferred; use WSL. An interactive terminal is required on stdin and stdout,
+except for help, version, --init, --check, and shell setup options.
+.SH SEE ALSO
+.BR sh (1),
+.BR zsh (1)
+.PP
+The source distribution contains user guides under docs/guide/.
+.SH BUILD INFORMATION
+The --version and --version-full switches report the package version, Git
+commit,
+exact tags, Git description, compiler, target, and build profile. The -V
+switch
+prints only the name and package version. Information is embedded at build
+time;
+Git is not required at runtime. Unavailable metadata is shown as unknown.
+Nix builds preserve the flake revision but generally lack tag metadata.
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.SH VERSION
+v0.1.0

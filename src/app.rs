@@ -169,7 +169,7 @@ impl App {
                 "Demo complete · prefix o to edit or load another demo".into()
             };
             frame.render_widget(
-                Paragraph::new(text)
+                Paragraph::new(format!("{}\n{text}", self.demo.title))
                     .style(Style::default().fg(Color::White).bg(Color::Rgb(28, 35, 48))),
                 chunks[0],
             );
@@ -202,12 +202,12 @@ impl App {
             pane.render(inner(area), frame.buffer_mut());
         }
         let status = if self.prefix {
-            "PREFIX: n run · s skip · e edit queue · o config · a add · Tab focus · c cues · 0 focus cues · l layout · h header · x restart · q quit · ? help"
+            "PREFIX: n run · s skip · e edit cue · o edit demo/add cues · a add · Tab focus · c cues · 0 focus cues · l layout · h header · x restart · q quit · ? help"
         } else {
             &self.status
         };
         let hints = if self.cues.focused {
-            "CUES: ↑/↓ select · Enter run · e edit · Tab/Esc shell · Ctrl-G c hide"
+            "↑↓ select · Enter run · e edit cue · o edit demo/add cues · Ctrl-G c hide"
         } else {
             "Ctrl-G: controls   Alt-←/→: focus   Click: focus   Drag border: resize   Alt-click: URL"
         };
@@ -224,11 +224,9 @@ impl App {
             frame.render_widget(Clear, area);
             let title = match editor.kind {
                 EditorKind::Demo => {
-                    " Demo TOML · Ctrl-L load · Ctrl-S save as · Ctrl-G apply · Esc cancel "
+                    " Full demo TOML · Ctrl-L load · Ctrl-S save as · Ctrl-G apply · Esc cancel "
                 }
-                EditorKind::Queue(_) => {
-                    " Queue TOML · Ctrl-G apply (rewinds this item) · Esc cancel "
-                }
+                EditorKind::Queue(_) => " Single cue TOML · Ctrl-G apply · Esc cancel ",
                 EditorKind::LoadPath => " Load path · Enter load · Esc cancel ",
                 EditorKind::SavePath => " Save path · Enter save & apply · Esc cancel ",
             };
@@ -242,7 +240,15 @@ impl App {
                 UiLayout::vertical([Constraint::Min(1), Constraint::Length(3)]).split(inner(area));
             frame.render_widget(&editor.text, parts[0]);
             frame.render_widget(
-                Paragraph::new(editor.error.as_str())
+                Paragraph::new(if !editor.error.is_empty() {
+                    editor.error.as_str()
+                } else if editor.kind == EditorKind::Demo {
+                    "Edit title at the top. Add/reorder [[queues]] below. Ctrl-L loads a file; Ctrl-S saves."
+                } else if matches!(editor.kind, EditorKind::Queue(_)) {
+                    "Editing one cue. Esc then prefix-o opens the full demo to add cues or edit its title."
+                } else {
+                    "Enter a file path; Enter confirms and Esc cancels."
+                })
                     .style(Style::default().fg(Color::LightRed))
                     .wrap(Wrap { trim: false }),
                 parts[1],
@@ -330,12 +336,7 @@ impl App {
                             self.demo.cue_list = true;
                             self.cues.focused = true;
                         }
-                        KeyCode::Char('o') => {
-                            self.editor = Some(Editor::new(
-                                EditorKind::Demo,
-                                toml::to_string_pretty(&self.demo)?,
-                            ))
-                        }
+                        KeyCode::Char('o') => self.edit_demo()?,
                         KeyCode::Char('a') => self.add_pane()?,
                         KeyCode::Tab | KeyCode::Right => self.rotate(1),
                         KeyCode::BackTab | KeyCode::Left => self.rotate(-1),
@@ -402,6 +403,13 @@ impl App {
             self.cues.focused = false;
         }
     }
+    fn edit_demo(&mut self) -> Result<()> {
+        self.editor = Some(Editor::new(
+            EditorKind::Demo,
+            toml::to_string_pretty(&self.demo)?,
+        ));
+        Ok(())
+    }
     fn edit_queue(&mut self, index: usize) -> Result<()> {
         if let Some(queue) = self.demo.queues.get(index) {
             self.editor = Some(Editor::new(
@@ -434,6 +442,7 @@ impl App {
             ),
             KeyCode::Enter => self.execute_selected()?,
             KeyCode::Char('e') => self.edit_queue(self.cues.selected)?,
+            KeyCode::Char('o') => self.edit_demo()?,
             KeyCode::Tab | KeyCode::Right => self.rotate(1),
             KeyCode::BackTab | KeyCode::Left => self.rotate(-1),
             KeyCode::Esc => self.cues.focused = false,
@@ -767,7 +776,7 @@ fn open_url(url: &str) -> Result<()> {
     });
     Ok(())
 }
-const HELP: &str = "Every pane is a live PTY shell. Type normally; Ctrl-C reaches the shell.\n\nPress Ctrl-G, release, then:\n  n / Enter    Send the next command and advance\n  s            Skip the next command\n  e            Edit current queue item before running it\n  o            Open full demo editor (panes, queues, layout, shells)\n  a            Add and focus an ad hoc shell\n  Tab / →      Focus next pane; Shift-Tab / ← goes back\n  0            Show and focus the cue list\n  c            Show/hide the cue list\n  1–9          Focus shell pane by number\n  l / h        Cycle layout / toggle header\n  x            Restart focused shell (ends its current session)\n  q            Quit and close all shells\n\nIn Cues: ↑/↓ browse, Enter sends the selected cue, e edits it.\nTab/Esc returns to a shell. Enter resumes a partially sent current cue.\nCommands are dispatched in order without waiting for completion.\n\nAlt-Left/Right rotates focus, including Cues. Ghostty mappings also accept Alt-B/F. Click a pane to focus.\nDrag a shared border to resize. Grid rows are equal height.\nScroll wheel uses scrollback; Shift-wheel overrides application mouse mode.\nAlt-click opens HTTP(S) links. Cmd-click works locally on macOS outside tmux when the host forwards the click.\nOver SSH, URL openers run on the remote host.\n\nEditor: Ctrl-L load, Ctrl-S save as, Ctrl-G apply, Esc cancel.\nLoading previews the file; applying resets queue progress. Changing a pane\nname/shell/args/cwd creates a new session. Removed sessions are closed.\nCommands are sent to the pane's current foreground program: wait for its\nprompt before running the next command. No automatic completion detection.";
+const HELP: &str = "Every pane is a live PTY shell. Type normally; Ctrl-C reaches the shell.\n\nPress Ctrl-G, release, then:\n  n / Enter    Send the next command and advance\n  s            Skip the next command\n  e            Edit current queue item before running it\n  o            Edit full demo (title, add/reorder cues, panes, layout)\n  a            Add and focus an ad hoc shell\n  Tab / →      Focus next pane; Shift-Tab / ← goes back\n  0            Show and focus the cue list\n  c            Show/hide the cue list\n  1–9          Focus shell pane by number\n  l / h        Cycle layout / toggle header\n  x            Restart focused shell (ends its current session)\n  q            Quit and close all shells\n\nIn Cues: ↑/↓ browse, Enter sends the selected cue, e edits it; o edits the entire demo.\nTab/Esc returns to a shell. Enter resumes a partially sent current cue.\nCommands are dispatched in order without waiting for completion.\n\nAlt-Left/Right rotates focus, including Cues. Ghostty mappings also accept Alt-B/F. Click a pane to focus.\nDrag a shared border to resize. Grid rows are equal height.\nScroll wheel uses scrollback; Shift-wheel overrides application mouse mode.\nAlt-click opens HTTP(S) links. Cmd-click works locally on macOS outside tmux when the host forwards the click.\nOver SSH, URL openers run on the remote host.\n\nEditor: Ctrl-L load, Ctrl-S save as, Ctrl-G apply, Esc cancel.\nLoading previews the file; applying resets queue progress. Changing a pane\nname/shell/args/cwd creates a new session. Removed sessions are closed.\nCommands are sent to the pane's current foreground program: wait for its\nprompt before running the next command. No automatic completion detection.";
 
 #[cfg(all(test, unix))]
 mod tests {
@@ -1015,15 +1024,24 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         app.path = dir.path().join("saved.toml");
         app.demo.header = false;
-        app.editor = Some(Editor::new(
-            EditorKind::Demo,
-            toml::to_string(&app.demo).unwrap(),
+        app.demo.title = "Full demo title".into();
+        let mut added = app.demo.queues[0].clone();
+        added.name = "Added cue".into();
+        app.demo.queues.push(added);
+        app.cues.focused = true;
+        key(&mut app, KeyCode::Char('o'), KeyModifiers::NONE);
+        assert!(matches!(
+            app.editor.as_ref().unwrap().kind,
+            EditorKind::Demo
         ));
+        assert!(app.editor.as_ref().unwrap().content().contains("Added cue"));
         key(&mut app, KeyCode::Char('s'), KeyModifiers::CONTROL);
         key(&mut app, KeyCode::Enter, KeyModifiers::NONE);
         assert!(app.editor.is_none());
         assert!(!Demo::load(&app.path).unwrap().header);
         app.demo.header = true;
+        app.demo.title = "Unsaved title".into();
+        app.demo.queues.pop();
         app.editor = Some(Editor::new(
             EditorKind::Demo,
             toml::to_string(&app.demo).unwrap(),
@@ -1031,7 +1049,12 @@ mod tests {
         key(&mut app, KeyCode::Char('l'), KeyModifiers::CONTROL);
         key(&mut app, KeyCode::Enter, KeyModifiers::NONE);
         assert!(app.demo.header); // Load previews; it does not apply or execute.
+        assert_eq!(app.demo.title, "Unsaved title");
+        assert_eq!(app.demo.queues.len(), 1);
         key(&mut app, KeyCode::Char('g'), KeyModifiers::CONTROL);
         assert!(!app.demo.header);
+        assert_eq!(app.demo.title, "Full demo title");
+        assert_eq!(app.demo.queues[1].name, "Added cue");
+        assert_eq!((app.queue, app.command), (0, 0));
     }
 }

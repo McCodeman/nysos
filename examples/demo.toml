@@ -1,4 +1,5 @@
 # Pane count is the number of [[panes]] entries (1–16).
+title = "nysos walkthrough"
 prefix = "ctrl-g"
 header = true
 cue_list = true

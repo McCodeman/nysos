@@ -1,6 +1,10 @@
 # Editing and saving
 
-**Prefix, o** opens a multiline TOML editor with cursor movement, selection,
+**Ctrl-G, o** (your configured prefix, then `o`) opens the **entire demo**,
+including its title, every cue, and all panes. In the cue sidebar, plain **o**
+opens the same editor; **e** edits only the selected cue.
+
+The full demo editor is a multiline TOML editor with cursor movement, selection,
 copy/paste inside the editor, and undo/redo provided by tui-textarea. Paste from
 the system clipboard with your host terminal's paste shortcut.
 
@@ -30,6 +34,34 @@ Apply executes nothing. Editing the current playback item rewinds it to its
 first command; editing another item preserves playback progress. Esc cancels.
 Use the full demo editor to save edited cues, sidebar visibility, and width.
 
+
+## Add cues and rename the demo
+
+1. Click the cue list and press **o**, or press **Ctrl-G**, release it, then **o**.
+2. To load a file from disk, press **Ctrl-L** (or **F2**), enter its path, and
+   press **Enter**. This previews the entire file. Opening the editor without
+   loading starts with the current in-memory demo, including unsaved changes.
+3. Edit the top-level `title = "My demo"` before the first table heading.
+4. Add a new `[[queues]]` block at the end, or edit/reorder existing blocks:
+
+   ```toml
+   [[queues]]
+   name = "Inspect the service"
+   description = "Show the current directory and files."
+   commands = [
+     { pane = "presenter", command = "pwd" },
+     { pane = "presenter", command = "ls -lah" },
+   ]
+   ```
+
+   Use an existing pane name in each command. Each cue needs at least one
+   command. To remove a cue, remove its whole `[[queues]]` block.
+5. Press **Ctrl-S** (or **F3**), choose a save path, and press **Enter** to save
+   and apply. **Ctrl-G** (or **F4**) applies without saving. **Esc** cancels.
+
+The demo title appears above the current cue when the header is enabled.
+Applying the full demo resets cue progress and executes no queued commands.
+Matching shell sessions are preserved.
 
 ## A typical edit
 

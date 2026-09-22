@@ -11,6 +11,7 @@ inside configured paths are not expanded.
 This example uses `/bin/sh` on both macOS and Linux:
 
 ```toml
+title = "Service walkthrough"
 prefix = "ctrl-g"
 header = true
 cue_list = true
@@ -52,6 +53,7 @@ commands = [
 
 | Field | Type | Default when omitted | Meaning |
 | --- | --- | --- | --- |
+| `title` | String | `"nysos demo"` | Nonempty demo title displayed above cue details when the header is enabled; control characters are rejected. |
 | `terminal_keys` | String enum | `"auto"` | `"auto"` detects Ghostty using TERM_PROGRAM/TERM; `"ghostty"` adds Alt-B/F focus aliases; `"standard"` preserves those shell keys. `--terminal-keys` overrides at startup. |
 | `prefix` | String enum | `"ctrl-g"` | Control prefix: `"ctrl-g"`, `"ctrl-a"`, `"ctrl-b"`, or `"f12"`. `--prefix` overrides it at startup. |
 | `header` | Boolean | `true` | Show queue item index, name, description, and next command above the panes. |

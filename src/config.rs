@@ -5,6 +5,7 @@ use std::{collections::HashSet, path::Path};
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Demo {
+    pub title: String,
     pub prefix: crate::prefix::Prefix,
     pub terminal_keys: crate::prefix::TerminalKeys,
     pub header: bool,
@@ -78,6 +79,7 @@ impl Default for PaneConfig {
 impl Default for Demo {
     fn default() -> Self {
         Self {
+            title: "nysos demo".into(),
             prefix: crate::prefix::Prefix::default(),
             terminal_keys: crate::prefix::TerminalKeys::Auto,
             header: true,
@@ -128,6 +130,9 @@ impl Demo {
     }
 
     pub fn validate(&self) -> Result<()> {
+        if self.title.trim().is_empty() || self.title.chars().any(char::is_control) {
+            bail!("Demo title must be nonempty and contain no control characters");
+        }
         if !(16..=60).contains(&self.cue_width) {
             bail!("cue_width must be between 16 and 60 columns");
         }
@@ -222,6 +227,9 @@ mod tests {
     #[test]
     fn cue_sidebar_defaults_and_width_validation() {
         let demo = Demo::parse("header = false").unwrap();
+        assert_eq!(demo.title, "nysos demo");
+        assert!(Demo::parse("title = ''").is_err());
+        assert!(Demo::parse("title = \"line\\nline\"").is_err());
         assert_eq!(demo.terminal_keys, crate::prefix::TerminalKeys::Auto);
         assert_eq!(
             Demo::parse("terminal_keys = 'standard'")

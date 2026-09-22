@@ -40,7 +40,7 @@ After **Ctrl-G**:
 | `n` or Enter | Send the next command, then advance |
 | `s` | Skip the next command |
 | `e` | Edit the current queue item's name, description, targets, and commands |
-| `o` | Open the complete demo configuration editor |
+| `o` | Edit the entire demo: title, add/reorder cues, panes, and layout |
 | `a` | Add and focus an ad hoc shell |
 | Tab / Right | Focus the next pane |
 | Shift-Tab / Left | Focus the previous pane |
@@ -74,7 +74,8 @@ press **Ctrl-G, 0**. While focused:
 | Home / End | Select the first / last cue |
 | Page Up / Page Down | Browse a page at a time |
 | Enter | Send all remaining commands in the selected cue |
-| `e` | Edit the selected cue in the modal |
+| `e` | Edit only the selected cue in the modal |
+| `o` | Open the entire demo to add cues, rename the demo, or load/save a file |
 | Tab / Shift-Tab | Cycle focus to a shell |
 | Esc | Return to the last focused shell |
 

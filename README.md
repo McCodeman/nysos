@@ -24,7 +24,9 @@ make run
 Press **Ctrl-G**, release, then **n** to run the next command. **Ctrl-G, ?**
 shows controls; **Ctrl-G, q** quits.
 The left cue list supports **Up/Down**, **Enter** to run a cue, and **e** to edit
-it. **Ctrl-G, 0** focuses the list; **Ctrl-G, c** shows or hides it.
+it. Press **o** in the list (or **Ctrl-G, o** anywhere) to edit the full demo,
+add cues, and change its title; Ctrl-L loads a file and Ctrl-S saves.
+**Ctrl-G, 0** focuses the list; **Ctrl-G, c** shows or hides it.
 Ctrl-G avoids tmux’s default Ctrl-B. Use `--prefix` to customize it; see
 [tmux and SSH](docs/guide/tmux-ssh.md) for remote setup and mouse forwarding.
 Ghostty Option-arrows are detected automatically; use `--terminal-keys ghostty`

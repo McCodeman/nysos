@@ -74,11 +74,12 @@ EXAMPLES:
 INTERACTIVE CONTROLS:
   Press Ctrl-G, release, then:
     n / Enter  Send next command       s  Skip next command
-    e          Edit current queue     o  Load/edit/save demo configuration
+    e          Edit current queue     o  Edit full demo: title, cues, panes
     a          Add a live pane        Tab  Focus next pane
     0          Focus cue list         c  Show/hide cue list
     ?          Show all controls      q  Quit and close shell sessions
-  In the cue list: Up/Down selects, Enter sends a cue, e edits it.
+  In the cue list: Up/Down selects, Enter sends a cue, e edits it, o edits the full
+  demo.
   Cue commands are sent in order without waiting for completion.
   Alt-Left/Right rotates focus; Ghostty mappings also accept Alt-B/F. Click to focus;
   drag dividers to resize.

@@ -51,7 +51,7 @@ Skip the next command.
 Edit the current queue item. Applying rewinds that item without executing it.
 .TP
 .B o
-Open the full configuration editor. Ctrl-L loads a preview; Ctrl-S saves and
+Open the full demo editor to change the title, add or reorder cues, or edit panes. Ctrl-L loads a preview; Ctrl-S saves and
 applies; Ctrl-G applies without saving; Esc cancels. F2, F3, and F4 are aliases.
 Applying a full demo resets queue progress. Matching shell sessions are reused.
 .TP
@@ -74,6 +74,7 @@ Restart the focused shell, ending its current session.
 Show help or quit, respectively. Esc closes help.
 .PP
 In the cue list, Up/Down selects, Enter sends the selected cue, and e edits it.
+Plain o opens the full demo editor to add cues or edit the demo title.
 Home/End and Page Up/Down browse; the wheel scrolls the list. Click selects
 without executing. Esc returns to the previous shell. Enter resumes the current
 partially sent cue or replays an earlier cue. Commands are sent in order without
@@ -92,7 +93,7 @@ Cmd-click opens HTTP(S) links locally on macOS when the terminal forwards the
 click. Alt-click is the portable fallback. Plain URLs spanning rows are not joined.
 .SH CONFIGURATION
 Demo files use TOML. No file is automatically discovered. The top-level fields
-are prefix (ctrl-g by default), header (boolean, default true), cue_list (boolean, default true),
+are title (nonempty text, default "nysos demo"), prefix (ctrl-g by default), header (boolean, default true), cue_list (boolean, default true),
 cue_width (16 to 60 columns, default 26, capped at half the available width),
 layout (columns, rows, or grid), panes, and
 queues. Omitted panes and queues independently retain the built-in defaults.

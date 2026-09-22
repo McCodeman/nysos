@@ -85,7 +85,7 @@ impl App {
             pending_demo: None,
             help: false,
             quit: false,
-            status: "Ctrl-B then ? for help · n runs the next command".into(),
+            status: "Prefix then ? for help · n runs the next command".into(),
             rects: vec![],
             drag: None,
             cues: CueList::default(),
@@ -198,13 +198,16 @@ impl App {
             &self.status
         };
         let hints = if self.cues.focused {
-            "CUES: ↑/↓ select · Enter run · e edit · Tab/Esc shell · Ctrl-B c hide"
+            "CUES: ↑/↓ select · Enter run · e edit · Tab/Esc shell · Ctrl-G c hide"
         } else {
-            "Ctrl-B: controls   Alt-←/→: focus   Click: focus   Drag border: resize   Alt-click: URL"
+            "Ctrl-G: controls   Alt-←/→: focus   Click: focus   Drag border: resize   Alt-click: URL"
         };
         frame.render_widget(
-            Paragraph::new(vec![Line::from(status), Line::from(hints)])
-                .style(Style::default().fg(Color::Gray)),
+            Paragraph::new(vec![
+                Line::from(status),
+                Line::from(hints.replace("Ctrl-G", self.demo.prefix.label())),
+            ])
+            .style(Style::default().fg(Color::Gray)),
             chunks[2],
         );
         if let Some(editor) = &self.editor {
@@ -239,10 +242,13 @@ impl App {
             let area = popup(area, 88, 85);
             frame.render_widget(Clear, area);
             frame.render_widget(
-                Paragraph::new(HELP)
-                    .block(Block::bordered().title(" nysos controls · Esc closes "))
-                    .style(Style::default().bg(Color::Rgb(20, 26, 36)))
-                    .wrap(Wrap { trim: false }),
+                Paragraph::new(HELP.replace(
+                    "Press Ctrl-G",
+                    &format!("Press {}", self.demo.prefix.label()),
+                ))
+                .block(Block::bordered().title(" nysos controls · Esc closes "))
+                .style(Style::default().bg(Color::Rgb(20, 26, 36)))
+                .wrap(Wrap { trim: false }),
                 area,
             );
         } else if !self.cues.focused
@@ -287,6 +293,13 @@ impl App {
             Event::Key(key) => {
                 if self.prefix {
                     self.prefix = false;
+                    if self.demo.prefix.matches(key) {
+                        if !self.cues.focused {
+                            let bytes = input::key_bytes(key, *self.panes[self.active].term.mode());
+                            self.panes[self.active].write(&bytes)?;
+                        }
+                        return Ok(());
+                    }
                     match key.code {
                         KeyCode::Char('q') => self.quit = true,
                         KeyCode::Char('n') | KeyCode::Enter => self.step(false)?,
@@ -330,18 +343,9 @@ impl App {
                                 self.cues.focused = false;
                             }
                         }
-                        KeyCode::Char('b')
-                            if key.modifiers.contains(KeyModifiers::CONTROL)
-                                && !self.cues.focused =>
-                        {
-                            let bytes = input::key_bytes(key, *self.panes[self.active].term.mode());
-                            self.panes[self.active].write(&bytes)?;
-                        }
                         _ => {}
                     }
-                } else if key.modifiers.contains(KeyModifiers::CONTROL)
-                    && key.code == KeyCode::Char('b')
-                {
+                } else if self.demo.prefix.matches(key) {
                     self.prefix = true;
                 } else if key.modifiers.contains(KeyModifiers::ALT)
                     && matches!(key.code, KeyCode::Left | KeyCode::Right)
@@ -422,7 +426,10 @@ impl App {
     fn execute_selected(&mut self) -> Result<()> {
         let index = self.cues.selected;
         let Some(cue) = self.demo.queues.get(index) else {
-            self.status = "No cues configured · Ctrl-B o to add them".into();
+            self.status = format!(
+                "No cues configured · {} o to add them",
+                self.demo.prefix.label()
+            );
             return Ok(());
         };
         let start = if index == self.queue { self.command } else { 0 };
@@ -436,8 +443,9 @@ impl App {
             pane.pump()?;
             if pane.exited {
                 bail!(
-                    "Pane '{}' has exited; focus it and use Ctrl-B x before running this cue",
-                    command.pane
+                    "Pane '{}' has exited; focus it and use {} x before running this cue",
+                    command.pane,
+                    self.demo.prefix.label()
                 );
             }
         }
@@ -741,7 +749,7 @@ fn open_url(url: &str) -> Result<()> {
     });
     Ok(())
 }
-const HELP: &str = "Every pane is a live PTY shell. Type normally; Ctrl-C reaches the shell.\n\nPress Ctrl-B, release, then:\n  n / Enter    Send the next command and advance\n  s            Skip the next command\n  e            Edit current queue item before running it\n  o            Open full demo editor (panes, queues, layout, shells)\n  a            Add and focus an ad hoc shell\n  Tab / →      Focus next pane; Shift-Tab / ← goes back\n  0            Show and focus the cue list\n  c            Show/hide the cue list\n  1–9          Focus shell pane by number\n  l / h        Cycle layout / toggle header\n  x            Restart focused shell (ends its current session)\n  q            Quit and close all shells\n\nIn Cues: ↑/↓ browse, Enter sends the selected cue, e edits it.\nTab/Esc returns to a shell. Enter resumes a partially sent current cue.\nCommands are dispatched in order without waiting for completion.\n\nAlt-Left/Right rotates focus (including Cues) without a prefix. Click a pane to focus.\nDrag a shared border to resize. Grid rows are equal height.\nScroll wheel uses scrollback; Shift-wheel overrides application mouse mode.\nAlt-click opens HTTP(S) links. Cmd-click works locally on macOS when the host forwards the click.\n\nEditor: Ctrl-L load, Ctrl-S save as, Ctrl-G apply, Esc cancel.\nLoading previews the file; applying resets queue progress. Changing a pane\nname/shell/args/cwd creates a new session. Removed sessions are closed.\nCommands are sent to the pane's current foreground program: wait for its\nprompt before running the next command. No automatic completion detection.";
+const HELP: &str = "Every pane is a live PTY shell. Type normally; Ctrl-C reaches the shell.\n\nPress Ctrl-G, release, then:\n  n / Enter    Send the next command and advance\n  s            Skip the next command\n  e            Edit current queue item before running it\n  o            Open full demo editor (panes, queues, layout, shells)\n  a            Add and focus an ad hoc shell\n  Tab / →      Focus next pane; Shift-Tab / ← goes back\n  0            Show and focus the cue list\n  c            Show/hide the cue list\n  1–9          Focus shell pane by number\n  l / h        Cycle layout / toggle header\n  x            Restart focused shell (ends its current session)\n  q            Quit and close all shells\n\nIn Cues: ↑/↓ browse, Enter sends the selected cue, e edits it.\nTab/Esc returns to a shell. Enter resumes a partially sent current cue.\nCommands are dispatched in order without waiting for completion.\n\nAlt-Left/Right rotates focus (including Cues) without a prefix. Click a pane to focus.\nDrag a shared border to resize. Grid rows are equal height.\nScroll wheel uses scrollback; Shift-wheel overrides application mouse mode.\nAlt-click opens HTTP(S) links. Cmd-click works locally on macOS outside tmux when the host forwards the click.\nOver SSH, URL openers run on the remote host.\n\nEditor: Ctrl-L load, Ctrl-S save as, Ctrl-G apply, Esc cancel.\nLoading previews the file; applying resets queue progress. Changing a pane\nname/shell/args/cwd creates a new session. Removed sessions are closed.\nCommands are sent to the pane's current foreground program: wait for its\nprompt before running the next command. No automatic completion detection.";
 
 #[cfg(all(test, unix))]
 mod tests {
@@ -760,17 +768,40 @@ mod tests {
         app.event(Event::Key(KeyEvent::new(code, modifiers)));
     }
     #[test]
-    fn ctrl_b_controls_demo_without_claiming_ctrl_space() {
+    fn ctrl_g_controls_demo_without_claiming_ctrl_space() {
         let mut app = app();
         key(&mut app, KeyCode::Char(' '), KeyModifiers::CONTROL);
         assert!(!app.prefix);
-        key(&mut app, KeyCode::Char('b'), KeyModifiers::CONTROL);
+        key(&mut app, KeyCode::Char('g'), KeyModifiers::CONTROL);
         assert!(app.prefix);
-        key(&mut app, KeyCode::Char('b'), KeyModifiers::CONTROL);
+        key(&mut app, KeyCode::Char('g'), KeyModifiers::CONTROL);
         assert!(!app.prefix);
-        key(&mut app, KeyCode::Char('b'), KeyModifiers::CONTROL);
+        key(&mut app, KeyCode::Char('g'), KeyModifiers::CONTROL);
         key(&mut app, KeyCode::Char('?'), KeyModifiers::NONE);
         assert!(app.help);
+    }
+    #[test]
+    fn alternate_prefixes_and_literal_prefix_forwarding() {
+        use crate::prefix::Prefix;
+        let mut app = app();
+        key(&mut app, KeyCode::Char('b'), KeyModifiers::CONTROL);
+        assert!(!app.prefix);
+        for (prefix, code, modifiers) in [
+            (Prefix::CtrlA, KeyCode::Char('a'), KeyModifiers::CONTROL),
+            (Prefix::CtrlB, KeyCode::Char('b'), KeyModifiers::CONTROL),
+            (Prefix::F12, KeyCode::F(12), KeyModifiers::NONE),
+        ] {
+            app.demo.prefix = prefix;
+            key(&mut app, code, modifiers);
+            assert!(app.prefix);
+            key(&mut app, code, modifiers);
+            assert!(!app.prefix);
+            assert_eq!(app.panes.len(), 2); // Ctrl-A twice must not invoke add-pane.
+            key(&mut app, code, modifiers);
+            key(&mut app, KeyCode::Char('0'), KeyModifiers::NONE);
+            assert!(app.cues.focused);
+            key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
+        }
     }
     #[test]
     fn queue_skip_edit_and_completion() {
@@ -805,7 +836,7 @@ mod tests {
         app.demo.queues.push(second);
         app.resize(Rect::new(0, 0, 100, 30)).unwrap();
         assert_eq!(app.rects[0].x, 26);
-        key(&mut app, KeyCode::Char('b'), KeyModifiers::CONTROL);
+        key(&mut app, KeyCode::Char('g'), KeyModifiers::CONTROL);
         key(&mut app, KeyCode::Char('0'), KeyModifiers::NONE);
         assert!(app.cues.focused);
         key(&mut app, KeyCode::Down, KeyModifiers::NONE);
@@ -829,7 +860,7 @@ mod tests {
         key(&mut app, KeyCode::Enter, KeyModifiers::NONE);
         assert_eq!((app.queue, app.command), (2, 0));
         assert!(app.cues.focused);
-        key(&mut app, KeyCode::Char('b'), KeyModifiers::CONTROL);
+        key(&mut app, KeyCode::Char('g'), KeyModifiers::CONTROL);
         key(&mut app, KeyCode::Char('c'), KeyModifiers::NONE);
         assert!(!app.demo.cue_list && !app.cues.focused);
         app.resize(Rect::new(0, 0, 100, 30)).unwrap();

@@ -54,7 +54,7 @@ impl CueList {
         let body = block.inner(self.area);
         frame.render_widget(block, self.area);
         if queues.is_empty() {
-            frame.render_widget(Paragraph::new("No cues\nCtrl-B o to add"), body);
+            frame.render_widget(Paragraph::new("No cues\nPrefix o to add"), body);
             return;
         }
         let lines: Vec<_> = queues

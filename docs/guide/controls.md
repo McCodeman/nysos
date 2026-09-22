@@ -4,7 +4,11 @@ When a shell is focused, normal typing, Enter, Tab, Ctrl-C, arrows, and function
 shell. **Alt-Left/Right** rotates focus. On macOS, configure Option as Alt/Meta
 in your terminal if needed, or use prefix-Tab.
 
-After **Ctrl-B**:
+The default prefix is **Ctrl-G**. Override it with `--prefix` or the demo
+`prefix` field; substitute your chosen key in the controls below. See
+[tmux and SSH](tmux-ssh.md) for remote sessions and mouse forwarding.
+
+After **Ctrl-G**:
 
 | Key | Action |
 | --- | --- |
@@ -37,7 +41,7 @@ terminals reserve Shift-mouse for their own selection/scrollback.
 ## Cue list
 
 The narrow left sidebar is visible by default. Click it, cycle focus into it, or
-press **Ctrl-B, 0**. While focused:
+press **Ctrl-G, 0**. While focused:
 
 | Key | Action |
 | --- | --- |
@@ -51,14 +55,14 @@ press **Ctrl-B, 0**. While focused:
 
 The mouse wheel browses the list; clicking selects without executing. The `▶`
 marker identifies playback progress independently of your selection. The header
-previews the selected cue while the list is focused. **Ctrl-B, c** toggles the
+previews the selected cue while the list is focused. **Ctrl-G, c** toggles the
 list, giving its space back to shell panes when hidden. Set `cue_list` and
 `cue_width` in the configuration to customize it.
 
 Enter resumes a partially sent current cue; selecting an earlier cue replays it.
 After dispatch, selection advances to the next cue, or stays on the last cue.
 Pressing Enter again on the last completed cue replays it. Commands are sent
-in order without waiting for completion. Use **Ctrl-B, n** for one command at a
+in order without waiting for completion. Use **Ctrl-G, n** for one command at a
 time when you need to wait between commands.
 
 ## Links on macOS
@@ -68,7 +72,8 @@ reports omit Command; for local macOS sessions nysos samples the
 [CoreGraphics modifier flags](https://developer.apple.com/documentation/coregraphics/cgeventflags)
 when a click arrives. No event tap or keyboard recording is installed. A terminal
 that consumes Cmd-click may open the link itself; nysos cannot handle clicks the
-host does not forward. This native modifier fallback is disabled over SSH.
+host does not forward. This native modifier fallback is disabled over SSH and inside tmux. URL openers
+run on the nysos host, so a remote nysos cannot open your client browser.
 
 **Alt-click** is the portable fallback. The app recognizes OSC 8 hyperlinks and
 plain URLs on a visible terminal row. Plain URLs wrapping across rows are not

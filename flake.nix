@@ -104,6 +104,7 @@
                 rust-analyzer
                 gnumake
                 git
+                tmux
                 pkg-config
                 python313
                 uv

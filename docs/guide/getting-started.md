@@ -20,8 +20,8 @@ cargo run -- --config demo.toml --check
 cargo run -- --config demo.toml
 ```
 
-Once open, press **Ctrl-B**, release, then **n** to send the next prepared
-command. Press **Ctrl-B, ?** for help. **Ctrl-B, q** exits.
+Once open, press **Ctrl-G**, release, then **n** to send the next prepared
+command. Press **Ctrl-G, ?** for help. **Ctrl-G, q** exits.
 
 
 For a system-wide command on your user PATH, run `make install`. For an optimized

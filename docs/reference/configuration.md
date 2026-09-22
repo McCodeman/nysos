@@ -11,6 +11,7 @@ inside configured paths are not expanded.
 This example uses `/bin/sh` on both macOS and Linux:
 
 ```toml
+prefix = "ctrl-g"
 header = true
 cue_list = true
 cue_width = 26
@@ -51,8 +52,9 @@ commands = [
 
 | Field | Type | Default when omitted | Meaning |
 | --- | --- | --- | --- |
+| `prefix` | String enum | `"ctrl-g"` | Control prefix: `"ctrl-g"`, `"ctrl-a"`, `"ctrl-b"`, or `"f12"`. `--prefix` overrides it at startup. |
 | `header` | Boolean | `true` | Show queue item index, name, description, and next command above the panes. |
-| `cue_list` | Boolean | `true` | Show the left cue sidebar; toggle with Ctrl-B, c. |
+| `cue_list` | Boolean | `true` | Show the left cue sidebar; toggle with Ctrl-G, c. |
 | `cue_width` | Integer | `26` | Sidebar width including borders, 16–60 columns; capped at half the content width in small terminals. |
 | `layout` | String enum | `"columns"` | `"columns"`, `"rows"`, or `"grid"`. |
 | `panes` | Array of pane tables | Built-in `presenter` and `observer` panes | Between 1 and 16 pane definitions; their count determines pane count. |
@@ -127,7 +129,7 @@ are rendered separately. Custom RGB theme definitions are not supported yet.
 | `description` | String | `""` | Presenter-facing description in the header. |
 | `commands` | Array of command tables | Required | One or more commands, sent in listed order. |
 
-Ctrl-B, n sends a single command. Enter in the cue sidebar sends all remaining
+Ctrl-G, n sends a single command. Enter in the cue sidebar sends all remaining
 commands of the selected item in order, without waiting for completion. Commands
 can target different panes within the same item. Skipping advances
 past one command; finishing the last command advances to the next queue item.

@@ -21,10 +21,12 @@ make build
 make run
 ```
 
-Press **Ctrl-B**, release, then **n** to run the next command. **Ctrl-B, ?**
-shows controls; **Ctrl-B, q** quits.
+Press **Ctrl-G**, release, then **n** to run the next command. **Ctrl-G, ?**
+shows controls; **Ctrl-G, q** quits.
 The left cue list supports **Up/Down**, **Enter** to run a cue, and **e** to edit
-it. **Ctrl-B, 0** focuses the list; **Ctrl-B, c** shows or hides it.
+it. **Ctrl-G, 0** focuses the list; **Ctrl-G, c** shows or hides it.
+Ctrl-G avoids tmux’s default Ctrl-B. Use `--prefix` to customize it; see
+[tmux and SSH](docs/guide/tmux-ssh.md) for remote setup and mouse forwarding.
 Click or use Alt-Left/Right to focus panes; drag shared borders to resize.
 
 ```sh

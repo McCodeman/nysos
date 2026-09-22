@@ -20,7 +20,7 @@ A demo is an ordered list of queue items. Each item contains one or more command
 and each command names its target pane. The header shows the item index, name,
 description, command index, and next command. Toggle it with **prefix, h**.
 
-Press **Ctrl-B**, release it, then:
+Press **Ctrl-G**, release it, then:
 
 - **n** or **Enter** sends the next command plus Enter to its target pane.
 - **s** skips that command without sending it.
@@ -40,11 +40,11 @@ sending another shell command. Ctrl-C goes to the focused pane.
 ## Browse and run cues
 
 The left cue list lets you jump directly to an item. Click it or press
-**Ctrl-B, 0**, browse with **Up/Down**, and press **e** to edit the selection.
+**Ctrl-G, 0**, browse with **Up/Down**, and press **e** to edit the selection.
 **Enter** dispatches its commands in order without waiting for completion, then
 selects the next cue. It resumes remaining commands for the current playback
 item; choosing an earlier item replays it. Browsing alone changes no progress.
-Use **Ctrl-B, c** to show/hide the list and **Esc** to return to your shell.
+Use **Ctrl-G, c** to show/hide the list and **Esc** to return to your shell.
 
 ## Work interactively
 

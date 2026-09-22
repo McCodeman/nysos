@@ -10,6 +10,11 @@ Loading a demo never automatically executes its queued commands.
 Usage: nysos [OPTIONS]
 
 Options:
+      --prefix <KEY>
+          Override the demo control prefix (default: ctrl-g; avoids default tmux prefix)
+
+          [possible values: ctrl-a, ctrl-b, ctrl-g, f12]
+
       --version-full
           Print full version, Git metadata, compiler, target, and build profile
 
@@ -62,7 +67,7 @@ EXAMPLES:
   nysos --config demo.toml             Present a saved demo
 
 INTERACTIVE CONTROLS:
-  Press Ctrl-B, release, then:
+  Press Ctrl-G, release, then:
     n / Enter  Send next command       s  Skip next command
     e          Edit current queue     o  Load/edit/save demo configuration
     a          Add a live pane        Tab  Focus next pane
@@ -74,6 +79,8 @@ INTERACTIVE CONTROLS:
   Cmd-click opens URLs locally on macOS; Alt-click is the portable fallback.
 
 NOTES:
+  Default Ctrl-G avoids tmux Ctrl-B; --prefix selects another key.
+  Over SSH use ssh -t; URL openers run on the nysos host.
   Interactive mode requires a terminal on both stdin and stdout.
   Wait for the target shell prompt before sending the next command.
   --check validates TOML and pane references, not shell availability or commands.

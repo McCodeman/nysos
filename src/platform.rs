@@ -1,10 +1,14 @@
 /// SGR mouse reports carry Shift/Alt/Ctrl, but omit Command. For a local
 /// macOS session, sample only modifier flags when a click arrives. This does
 /// not install an event tap or read keyboard contents. Remote sessions must
-/// use the modifiers supplied by their terminal (Alt-click).
+/// use the modifiers supplied by their terminal (Alt-click). A tmux server can
+/// outlive its original local client, so its environment cannot prove locality.
 #[cfg(target_os = "macos")]
 pub fn command_pressed() -> bool {
-    if std::env::var_os("SSH_CONNECTION").is_some() || std::env::var_os("SSH_TTY").is_some() {
+    if std::env::var_os("SSH_CONNECTION").is_some()
+        || std::env::var_os("SSH_TTY").is_some()
+        || std::env::var_os("TMUX").is_some()
+    {
         return false;
     }
     #[link(name = "CoreGraphics", kind = "framework")]

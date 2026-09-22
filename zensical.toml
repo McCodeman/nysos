@@ -10,6 +10,7 @@ nav = [
     { "Getting started" = "guide/getting-started.md" },
     { "PATH and completions" = "guide/shell-setup.md" },
     { "Presenting a demo" = "guide/presenting.md" },
+    { "tmux and SSH" = "guide/tmux-ssh.md" },
     { "Controls and mouse" = "guide/controls.md" },
     { "Editing and saving" = "guide/editor.md" },
     { "Troubleshooting" = "guide/troubleshooting.md" },

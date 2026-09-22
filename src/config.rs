@@ -5,6 +5,7 @@ use std::{collections::HashSet, path::Path};
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Demo {
+    pub prefix: crate::prefix::Prefix,
     pub header: bool,
     pub cue_list: bool,
     pub cue_width: u16,
@@ -76,6 +77,7 @@ impl Default for PaneConfig {
 impl Default for Demo {
     fn default() -> Self {
         Self {
+            prefix: crate::prefix::Prefix::default(),
             header: true,
             cue_list: true,
             cue_width: 26,
@@ -218,6 +220,12 @@ mod tests {
     #[test]
     fn cue_sidebar_defaults_and_width_validation() {
         let demo = Demo::parse("header = false").unwrap();
+        assert_eq!(demo.prefix, crate::prefix::Prefix::CtrlG);
+        assert_eq!(
+            Demo::parse("prefix = 'ctrl-b'").unwrap().prefix,
+            crate::prefix::Prefix::CtrlB
+        );
+        assert!(Demo::parse("prefix = 'ctrl-space'").is_err());
         assert!(demo.cue_list);
         assert_eq!(demo.cue_width, 26);
         let demo = Demo::parse("cue_list = false\ncue_width = 40").unwrap();

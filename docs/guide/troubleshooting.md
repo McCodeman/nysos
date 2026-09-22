@@ -5,12 +5,12 @@
 | “requires an interactive terminal” | Launch directly in a terminal, with both stdin and stdout attached. Use `--check` in scripts or CI. |
 | Shell fails to start | Check the pane's `shell`, `args`, and `cwd`. `/bin/zsh` may not be installed on Linux; try `/bin/sh`. |
 | Unknown pane in a command | Match the exact case-sensitive pane name. If you replaced the built-in panes, specify your own `queues` or set `queues = []`. |
-| Ctrl-B has no effect | Check host-terminal shortcuts. In default tmux, press Ctrl-B twice to send the prefix through to nysos. |
+| Prefix has no effect | Default is Ctrl-G. Check the active prefix in the footer; use `--prefix f12` if your multiplexer intercepts it. See [tmux and SSH](tmux-ssh.md). |
 | Alt-arrows do not rotate focus | Use prefix-Tab or click. On macOS, configure Option as Alt/Meta in the host terminal. |
 | A command appears inside an editor/REPL | Queue commands go to the current foreground program. Return to a shell prompt before advancing. |
 | A pane says `[exited]` | Focus it, then use prefix-x to start a new shell. |
 | A tiny terminal hides content | Enlarge the terminal, toggle the header off with prefix-h, change layout with prefix-l, or remove panes through the editor. |
-| Cmd-click does nothing | Use Alt-click. The terminal must forward clicks; the local Command-state fallback is disabled over SSH. Plain URLs wrapping across rows are not joined. |
+| Cmd-click does nothing | Use Alt-click. The terminal must forward clicks; the local Command-state fallback is disabled over SSH and inside tmux. The app opens URLs on the machine where it runs. Plain URLs wrapping across rows are not joined. |
 | Scroll wheel reaches an application | Hold Shift to request scrollback; your host terminal may itself intercept Shift-mouse. |
 | Edited commands run again | Applying a queue edit rewinds that item; applying a full demo rewinds all queue progress. Remove already-completed commands before applying a queue edit if needed. |
 | Comments disappear after save | The modal serializes normalized TOML and does not preserve comments. Keep annotated templates separately. |

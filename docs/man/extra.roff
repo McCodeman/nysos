@@ -38,7 +38,8 @@ updated while links are preserved. Each file replacement is atomic; the overall
 multi-file installation is not. Output reports updated and unchanged files.
 Remove the marked blocks and generated scripts to undo shell setup.
 .SH INTERACTIVE CONTROLS
-Press Ctrl-B, release, then one of the following keys.
+Press Ctrl-G (or the prefix selected with --prefix), release, then one of the
+following keys. Supported prefixes are ctrl-g, ctrl-a, ctrl-b, and f12.
 .TP
 .B n, Enter
 Send the next command to its target pane and advance.
@@ -77,7 +78,7 @@ Home/End and Page Up/Down browse; the wheel scrolls the list. Click selects
 without executing. Esc returns to the previous shell. Enter resumes the current
 partially sent cue or replays an earlier cue. Commands are sent in order without
 waiting for completion. Selection advances, staying on the last cue at the end;
-Enter on the completed last cue replays it. Ctrl-B n still sends one command.
+Enter on the completed last cue replays it. Ctrl-G n still sends one command.
 .PP
 Without the prefix, normal input and Ctrl-C go to the focused shell.
 Alt-Left/Right rotates focus. Click to focus; drag shared borders to resize.
@@ -88,7 +89,7 @@ Cmd-click opens HTTP(S) links locally on macOS when the terminal forwards the
 click. Alt-click is the portable fallback. Plain URLs spanning rows are not joined.
 .SH CONFIGURATION
 Demo files use TOML. No file is automatically discovered. The top-level fields
-are header (boolean, default true), cue_list (boolean, default true),
+are prefix (ctrl-g by default), header (boolean, default true), cue_list (boolean, default true),
 cue_width (16 to 60 columns, default 26, capped at half the available width),
 layout (columns, rows, or grid), panes, and
 queues. Omitted panes and queues independently retain the built-in defaults.
@@ -159,3 +160,14 @@ exact tags, Git description, compiler, target, and build profile. The -V switch
 prints only the name and package version. Information is embedded at build time;
 Git is not required at runtime. Unavailable metadata is shown as unknown.
 Nix builds preserve the flake revision but generally lack tag metadata.
+
+.SH TMUX AND SSH
+Ctrl-G avoids the default tmux Ctrl-B prefix. Enable tmux mouse forwarding with
+"tmux set-option -g mouse on". With --prefix ctrl-b under default tmux, press
+Ctrl-B twice before each nysos command. nysos does not change tmux bindings.
+.PP
+Use ssh -t to allocate a remote terminal. Run nysos inside remote tmux to retain
+sessions across disconnects. Prefix-Tab works when Alt-arrow keys are intercepted.
+URL openers run on the remote host, not the SSH client. Native macOS Command-key
+sampling is disabled over SSH and inside tmux; use client terminal link detection
+for a client-side browser. Modal editor shortcuts are independent of the prefix.

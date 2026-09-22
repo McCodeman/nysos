@@ -1,6 +1,9 @@
 //! Generate checked-in references from the executable's CLI definition.
 #[path = "../src/cli.rs"]
 mod cli;
+#[path = "../src/prefix.rs"]
+#[allow(dead_code)]
+mod prefix;
 
 use anyhow::{Context, Result, bail};
 use clap::CommandFactory;

@@ -6,6 +6,7 @@ mod input;
 mod layout;
 mod pane;
 mod platform;
+mod prefix;
 mod shell_setup;
 
 use anyhow::{Context, Result, bail};
@@ -54,12 +55,15 @@ fn main() -> Result<()> {
         println!("Created {}", path.display());
         return Ok(());
     }
-    let demo = args
+    let mut demo = args
         .config
         .as_ref()
         .map(|p| config::Demo::load(p))
         .transpose()?
         .unwrap_or_default();
+    if let Some(prefix) = args.prefix {
+        demo.prefix = prefix;
+    }
     demo.validate()?;
     if args.check {
         println!(

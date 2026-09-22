@@ -76,7 +76,7 @@ impl Pane {
         if !cwd.is_dir() {
             bail!(
                 "Working directory for pane '{}' does not exist or is not a directory: {}",
-                config.name,
+                config.id,
                 cwd.display()
             );
         }
@@ -86,7 +86,7 @@ impl Pane {
         let child = pair
             .slave
             .spawn_command(command)
-            .with_context(|| format!("Starting {} in {}", config.shell, config.name))?;
+            .with_context(|| format!("Starting {} in {}", config.shell, config.id))?;
         drop(pair.slave);
         let (tx, output) = mpsc::sync_channel(64);
         thread::spawn(move || {
@@ -178,7 +178,7 @@ impl Pane {
         if self.exited {
             bail!(
                 "Pane '{}' has exited; restart with prefix x",
-                self.config.name
+                self.config.id
             );
         }
         self.term.scroll_display(Scroll::Bottom);

@@ -16,15 +16,16 @@ inside panes, queues, and commands.
 | Location | All valid keys |
 | --- | --- |
 | Top level | `title`, `prefix`, `terminal_keys`, `header`, `cue_list`, `cue_width`, `layout`, `panes`, `queues` |
-| Each `[[panes]]` | `name`, `shell`, `args`, `cwd`, `scheme`, `weight` |
+| Each `[[panes]]` | `id`, `name` (legacy alias for `id`), `title`, `shell`, `args`, `cwd`, `scheme`, `weight` |
 | Each `[[queues]]` | `name`, `description`, `commands` |
-| Each command in a queue | `pane`, `command` |
+| Each command in a queue | `pane`, `command`, `title`, `scheme` |
 
 A **cue** in the UI is a `[[queues]]` item in TOML; `cues` is not an alias.
 Pane count comes from the number of `[[panes]]` entries, not a `pane_count`
-setting. A pane's `name` is also its displayed title; there is no pane `title`
-field. `scheme` selects a built-in palette; there is no `color` or custom RGB
-field. Keyboard mapping settings belong at the top level, not inside panes.
+setting. A pane's `id` is its stable command target; `title` is its display label
+and defaults to the ID. Legacy `name` is accepted as an alias for `id`; do not
+specify both. `scheme` selects a built-in theme; there is no `theme`, `color`, or
+custom RGB field. Keyboard mapping settings belong at the top level, not inside panes.
 
 ## Complete example
 
@@ -41,7 +42,8 @@ cue_width = 26
 layout = "columns"
 
 [[panes]]
-name = "presenter"
+id = "presenter"
+title = "Presenter shell"
 shell = "/bin/sh"
 args = []
 cwd = "."
@@ -49,7 +51,7 @@ scheme = "ocean"
 weight = 3
 
 [[panes]]
-name = "observer"
+id = "observer"
 shell = "/bin/sh"
 cwd = "/tmp"
 scheme = "ember"
@@ -67,7 +69,7 @@ commands = [
 name = "Explore"
 description = "Edit this item before running it if needed."
 commands = [
-  { pane = "presenter", command = "ls -lah" },
+  { pane = "presenter", command = "ls -lah", title = "Project files", scheme = "forest" },
   { pane = "observer", command = "printf 'https://ratatui.rs\\n'" },
 ]
 ```
@@ -87,7 +89,7 @@ commands = [
 | `queues` | Array of queue tables | Built-in `Welcome` item | Ordered queue items; an empty array is allowed. |
 
 Defaults apply independently: omitting `queues` retains the built-in commands
-for `presenter` and `observer`. If you define other pane names, explicitly supply
+for `presenter` and `observer`. If you define other pane IDs, explicitly supply
 `queues` or set `queues = []`. Otherwise validation may report an unknown target.
 An empty TOML file describes the built-in demo; `panes = []` is invalid.
 
@@ -103,7 +105,7 @@ For a purely interactive single-pane demo:
 queues = []
 
 [[panes]]
-name = "scratch"
+id = "scratch"
 ```
 
 Put top-level assignments before the first `[[panes]]` or `[[queues]]` table;
@@ -147,16 +149,20 @@ See [tmux and SSH](../guide/tmux-ssh.md) for examples.
 
 | Field | Type | Default when omitted | Meaning / validation |
 | --- | --- | --- | --- |
-| `name` | String | `"shell"` | Nonempty, unique, case-sensitive identity; also used as the visible title. |
+| `id` | String | `"shell"` | Nonempty, unique, case-sensitive identity; control characters are rejected. Commands target this value. |
+| `name` | String | Alias for `id` | Legacy spelling, accepted for compatibility. Specifying both `id` and `name` is invalid; saving writes `id`. |
+| `title` | String | Pane ID | Initial display title; nonempty with no control characters. Titles need not be unique. |
 | `shell` | String | `$SHELL`, or `"/bin/sh"` if unavailable | Nonempty executable path or name. Use `args` for arguments. |
 | `args` | Array of strings | `[]` | Arguments passed directly to the shell executable, e.g. `["-l"]`. |
 | `cwd` | String | Inherit launch directory | Working directory for this pane. Omit for inheritance; TOML has no null value. |
 | `scheme` | String enum | `"ocean"` | `"ocean"`, `"ember"`, `"forest"`, or `"mono"`. |
 | `weight` | Integer | `1` | Relative size from 1 through 1000. |
 
-Give every pane an explicit name: two panes that omit `name` both become `shell`
-and fail validation. Names are matched exactly, without trimming or case folding.
-A name that contains only whitespace is rejected.
+Give every pane an explicit ID: two panes that omit `id` (and its legacy alias
+`name`) both become `shell` and fail validation. IDs are matched exactly, without
+trimming or case folding. An ID that contains only whitespace is rejected.
+Changing a title preserves command targets and shell sessions; changing an ID
+requires updating command targets and starts a replacement session on apply.
 
 Shell paths and working directories are checked only when a PTY starts, not by
 `--check`. Shell commands do not belong in `shell`: use `shell = "/bin/zsh"` and
@@ -218,8 +224,23 @@ to a fresh shell. Do not assume completion before sending the next command.
 
 | Field | Type | Default when omitted | Meaning / validation |
 | --- | --- | --- | --- |
-| `pane` | String | Required | Exact name of an existing pane. |
+| `pane` | String | Required | Exact ID of an existing pane; never its display title. |
 | `command` | String | Required | Nonempty single-line shell input; NUL, CR, and LF are rejected. |
+| `title` | String | Keep current pane title | Change the target pane’s display title when dispatched; nonempty with no control characters. |
+| `scheme` | String enum | Keep current pane scheme | Change the target pane’s theme: `"ocean"`, `"ember"`, `"forest"`, or `"mono"`. |
+
+Title and scheme overrides apply when the command is sent (Enter in the cue list
+or Prefix, n), or typed without execution using `t`. They affect only the target
+pane and preserve its ID, shell, and scrollback. Subsequent cues keep the current
+values unless they explicitly override them. Browsing, previewing, and skipping
+commands do not apply styling. If jumping between cues, specify both fields when
+a cue needs a particular appearance regardless of the previously executed cue.
+Commands remain required; these overrides do not create styling-only commands.
+
+Runtime overrides are not written back into the initial `[[panes]]` definitions.
+Saving preserves the initial pane configuration and the overrides in each cue.
+Applying a full demo restores its initial titles and schemes while retaining
+matching shell sessions. Restarting a pane retains its current appearance.
 
 There is no per-command delay, environment, timeout, working directory, or
 completion condition. Commands run in the target pane's existing shell state.
@@ -246,11 +267,11 @@ standalone example uses the latter, with multiple commands in one cue:
 title = "Nested command example"
 
 [[panes]]
-name = "shell"
+id = "shell"
 shell = "/bin/sh"
 
 [[panes]]
-name = "files"
+id = "files"
 shell = "/bin/sh"
 
 [[queues]]
@@ -282,7 +303,7 @@ nysos --config demo.toml --check
 
 Validation rejects malformed TOML, wrong value types, unknown fields/enum values,
 blank titles or titles containing control characters, cue widths outside 16–60,
-zero or more than 16 panes, duplicate or blank pane names, empty shells, weights
+zero or more than 16 panes, duplicate or blank pane IDs, empty shells, weights
 outside 1–1000, missing/blank cue names, missing/empty command lists, repeated pane targets within a cue, unknown
 command targets, and blank commands or commands containing NUL/CR/LF. Integer
 bounds are inclusive. A disabled sidebar still requires a valid `cue_width`.
@@ -293,9 +314,9 @@ terminal forwards a chosen key. Shell and cwd failures appear when sessions
 start. There is no per-command `delay`, `timeout`, `env`, `cwd`, or completion
 condition; unsupported keys are rejected rather than ignored.
 
-Full-demo apply resets queue progress. Panes with matching name, shell, arguments,
+Full-demo apply resets queue progress. Panes with matching ID, shell, arguments,
 and working directory retain their sessions. A changed identity or shell setup
-starts a replacement session, and removed panes are closed. Scheme and weight
+starts a replacement session, and removed panes are closed. Pane title, scheme, and weight
 changes reuse the shell. Title, prefix, and sidebar changes also preserve matching
 sessions. A cue-only edit rewinds the edited item if it is the current playback item;
 editing another item leaves playback progress unchanged.

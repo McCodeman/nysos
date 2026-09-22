@@ -1,0 +1,67 @@
+# Run: nysos --config examples/pane-transitions.toml
+# Enter in the cue list executes the selected cue. Prefix, n steps one command.
+# Each command targets a stable pane ID and may change that pane's title/scheme.
+# Omitted panes keep their current appearance and shell state.
+title = "Independent pane titles and themes"
+header = true
+cue_list = true
+cue_width = 30
+layout = "columns"
+
+[[panes]]
+id = "service"
+title = "Service · ready"
+shell = "/bin/sh"
+scheme = "ocean"
+weight = 1
+
+[[panes]]
+id = "observer"
+title = "Observer · ready"
+shell = "/bin/sh"
+scheme = "mono"
+weight = 1
+
+[[queues]]
+name = "Introduce both shells"
+description = "Both panes get new titles, themes, and commands. Variables persist in their independent shells."
+commands = [
+  { pane = "service", title = "Service · setup", scheme = "forest", command = "DEMO_SERVICE=nysos; export DEMO_SERVICE; printf 'Service: %s\\n' \"$DEMO_SERVICE\"; pwd" },
+  { pane = "observer", title = "Observer · environment", scheme = "ocean", command = "DEMO_ROLE=observer; export DEMO_ROLE; printf 'Role: %s\\n' \"$DEMO_ROLE\"; uname -s" },
+]
+
+[[queues]]
+name = "Service only"
+description = "Only the service pane changes. The observer keeps its title, ocean theme, and shell state."
+commands = [
+  { pane = "service", title = "Service · inspecting", scheme = "ember", command = "printf 'Inspecting %s in %s\\n' \"$DEMO_SERVICE\" \"$PWD\"; ls -a" },
+]
+
+[[queues]]
+name = "Observer only"
+description = "Only the observer changes. Its command demonstrates that the original shell is still running."
+commands = [
+  { pane = "observer", title = "Observer · healthy", scheme = "forest", command = "printf 'Role still set: %s\\nSimulated health check: OK\\n' \"$DEMO_ROLE\"; date" },
+]
+
+[[queues]]
+name = "Title only"
+description = "Change the service title and execute a command. Omitting scheme retains its ember theme."
+commands = [
+  { pane = "service", title = "Service · shell state", command = "printf 'Same service shell: %s\\n' \"$DEMO_SERVICE\"; printf 'Working directory: '; pwd" },
+]
+
+[[queues]]
+name = "Theme only"
+description = "Change only the observer theme and execute a command. Its healthy title remains."
+commands = [
+  { pane = "observer", scheme = "mono", command = "printf 'Observer summary for %s\\nNo external services were started.\\n' \"$DEMO_ROLE\"" },
+]
+
+[[queues]]
+name = "Finish together"
+description = "Both panes receive distinct final titles, themes, and commands. IDs remain service and observer throughout."
+commands = [
+  { pane = "service", title = "Service · complete", scheme = "ocean", command = "printf 'Finished demonstration for %s\\n' \"$DEMO_SERVICE\"" },
+  { pane = "observer", title = "Observer · complete", scheme = "ember", command = "printf 'Finished observation as %s\\n' \"$DEMO_ROLE\"" },
+]

@@ -28,7 +28,9 @@ pub enum Layout {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct PaneConfig {
-    pub name: String,
+    #[serde(alias = "name")]
+    pub id: String,
+    pub title: Option<String>,
     pub shell: String,
     pub args: Vec<String>,
     pub cwd: Option<String>,
@@ -37,7 +39,7 @@ pub struct PaneConfig {
     pub weight: u16,
 }
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum Scheme {
     #[default]
@@ -56,17 +58,44 @@ pub struct Queue {
     pub commands: Vec<Command>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Command {
     pub pane: String,
     pub command: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scheme: Option<Scheme>,
+}
+
+fn validate_pane_title(title: Option<&str>) -> Result<()> {
+    if title.is_some_and(|title| title.trim().is_empty() || title.chars().any(char::is_control)) {
+        bail!("Pane titles must be nonempty and contain no control characters");
+    }
+    Ok(())
+}
+
+impl PaneConfig {
+    pub fn display_title(&self) -> &str {
+        self.title.as_deref().unwrap_or(&self.id)
+    }
+
+    pub fn apply_command_style(&mut self, command: &Command) {
+        if let Some(title) = &command.title {
+            self.title = Some(title.clone());
+        }
+        if let Some(scheme) = command.scheme {
+            self.scheme = scheme;
+        }
+    }
 }
 
 impl Default for PaneConfig {
     fn default() -> Self {
         Self {
-            name: "shell".into(),
+            id: "shell".into(),
+            title: None,
             shell: std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".into()),
             args: vec![],
             cwd: None,
@@ -88,11 +117,11 @@ impl Default for Demo {
             layout: Layout::Columns,
             panes: vec![
                 PaneConfig {
-                    name: "presenter".into(),
+                    id: "presenter".into(),
                     ..Default::default()
                 },
                 PaneConfig {
-                    name: "observer".into(),
+                    id: "observer".into(),
                     scheme: Scheme::Ember,
                     ..Default::default()
                 },
@@ -104,10 +133,12 @@ impl Default for Demo {
                     Command {
                         pane: "presenter".into(),
                         command: "printf 'Welcome to nysos!\\n'".into(),
+                        ..Default::default()
                     },
                     Command {
                         pane: "observer".into(),
                         command: "pwd".into(),
+                        ..Default::default()
                     },
                 ],
             }],
@@ -141,9 +172,13 @@ impl Demo {
         }
         let mut names = HashSet::new();
         for pane in &self.panes {
-            if pane.name.trim().is_empty() || !names.insert(pane.name.as_str()) {
-                bail!("Pane names must be nonempty and unique");
+            if pane.id.trim().is_empty()
+                || pane.id.chars().any(char::is_control)
+                || !names.insert(pane.id.as_str())
+            {
+                bail!("Pane IDs must be nonempty, unique, and contain no control characters");
             }
+            validate_pane_title(pane.title.as_deref())?;
             if pane.shell.trim().is_empty() || pane.weight == 0 || pane.weight > 1000 {
                 bail!("Each pane needs a shell and a weight from 1 to 1000");
             }
@@ -200,6 +235,7 @@ impl Queue {
             if !panes.contains(command.pane.as_str()) {
                 bail!("Unknown pane: {}", command.pane);
             }
+            validate_pane_title(command.title.as_deref())?;
             if command.command.trim().is_empty() || command.command.contains(['\0', '\r', '\n']) {
                 bail!(
                     "Commands must be nonempty single lines; use shell separators for compound commands"
@@ -233,6 +269,46 @@ pub fn test_shell_args() -> Vec<String> {
 mod tests {
     use super::*;
     #[test]
+    fn pane_ids_titles_and_legacy_names_round_trip() {
+        let demo = Demo::parse(
+            r#"
+queues = []
+[[panes]]
+name = "legacy"
+[[panes]]
+id = "stable"
+title = "Display name"
+"#,
+        )
+        .unwrap();
+        assert_eq!(demo.panes[0].id, "legacy");
+        assert_eq!(demo.panes[0].display_title(), "legacy");
+        assert_eq!(demo.panes[1].display_title(), "Display name");
+        let text = toml::to_string(&demo).unwrap();
+        assert!(!text.contains("name ="));
+        assert_eq!(Demo::parse(&text).unwrap().panes[1].id, "stable");
+        assert!(Demo::parse("queues = []\n[[panes]]\nid = 'a'\nname = 'b'").is_err());
+        for title in ["", " ", "bad\nline", "bad\u{1b}title"] {
+            let mut invalid = Demo::default();
+            invalid.panes[0].title = Some(title.into());
+            assert!(invalid.validate().is_err());
+            invalid.panes[0].title = None;
+            invalid.queues[0].commands[0].title = Some(title.into());
+            assert!(invalid.validate().is_err());
+        }
+        let mut demo = Demo::default();
+        demo.panes[0].title = Some("Shared title".into());
+        demo.panes[1].title = demo.panes[0].title.clone();
+        demo.queues[0].commands[0].title = Some("New title".into());
+        demo.queues[0].commands[0].scheme = Some(Scheme::Forest);
+        let text = toml::to_string(&demo).unwrap();
+        let loaded = Demo::parse(&text).unwrap();
+        assert_eq!(loaded.queues[0].commands[0].scheme, Some(Scheme::Forest));
+        assert!(Demo::parse(&text.replace("forest", "invalid")).is_err());
+        demo.queues[0].commands[0].pane = "Shared title".into();
+        assert!(demo.validate().is_err()); // Titles are never routing identities.
+    }
+    #[test]
     fn each_cue_allows_only_one_command_per_pane() {
         let mut demo = Demo::default();
         demo.queues.push(demo.queues[0].clone());
@@ -244,7 +320,7 @@ mod tests {
         assert!(error.contains("Welcome"));
         assert!(error.contains("presenter"));
         assert!(error.contains("at most one command per pane"));
-        let targets = demo.panes.iter().map(|p| p.name.as_str()).collect();
+        let targets = demo.panes.iter().map(|p| p.id.as_str()).collect();
         assert!(demo.queues[0].validate(&targets).is_err());
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("invalid.toml");
@@ -297,7 +373,7 @@ mod tests {
         demo.queues[0].commands[0].pane = "missing".into();
         assert!(demo.validate().is_err());
         demo = Demo::default();
-        demo.panes[1].name = demo.panes[0].name.clone();
+        demo.panes[1].id = demo.panes[0].id.clone();
         assert!(demo.validate().is_err());
     }
     #[test]

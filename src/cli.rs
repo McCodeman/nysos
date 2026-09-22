@@ -43,7 +43,7 @@ pub struct Args {
     /// Validate the selected demo without opening shells
     #[arg(
         long,
-        long_help = "Validate TOML syntax, pane count, names, weights, and command targets without spawning shells. With no --config, checks the built-in demo. Does not verify shell paths, working directories, or command syntax."
+        long_help = "Validate TOML syntax, pane count, IDs, titles, weights, and command targets without spawning shells. With no --config, checks the built-in demo. Does not verify shell paths, working directories, or command syntax."
     )]
     pub check: bool,
     /// Write a starter TOML file and exit (never overwrite)

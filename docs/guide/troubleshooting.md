@@ -4,7 +4,7 @@
 | --- | --- |
 | “requires an interactive terminal” | Launch directly in a terminal, with both stdin and stdout attached. Use `--check` in scripts or CI. |
 | Shell fails to start | Check the pane's `shell`, `args`, and `cwd`. `/bin/zsh` may not be installed on Linux; try `/bin/sh`. |
-| Unknown pane in a command | Match the exact case-sensitive pane name. If you replaced the built-in panes, specify your own `queues` or set `queues = []`. |
+| Unknown pane in a command | Match the exact case-sensitive pane ID. If you replaced the built-in panes, specify your own `queues` or set `queues = []`. |
 | Prefix has no effect | Default is Ctrl-G. Check the active prefix in the footer; use `--prefix f12` if your multiplexer intercepts it. See [tmux and SSH](tmux-ssh.md). |
 | Option/Alt-Left or Right does not rotate focus | Current nysos supports standard Alt-arrows and detects Ghostty’s default `Esc b` / `Esc f`. Use `--terminal-keys ghostty` if tmux/SSH masks the terminal identity, or `standard` to preserve shell Alt-B/F. Rebuild/reinstall if using an older binary; inspect `ghostty +list-keybinds` for custom actions. Use prefix-Tab or click if the terminal consumes the shortcut. |
 | A command appears inside an editor/REPL | Queue commands go to the current foreground program. Return to a shell prompt before advancing. |

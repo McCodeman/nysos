@@ -7,14 +7,16 @@ cue_width = 26
 layout = "columns" # columns, rows, grid
 
 [[panes]]
-name = "presenter"
+id = "presenter"
+title = "Presenter shell"
 shell = "/bin/zsh"
 args = ["-l"]
 scheme = "ocean" # ocean, ember, forest, mono
 weight = 3
 
 [[panes]]
-name = "observer"
+id = "observer"
+title = "Observer shell"
 shell = "/bin/sh"
 scheme = "ember"
 weight = 2
@@ -31,7 +33,7 @@ commands = [
 name = "Explore"
 description = "Edit this item with Ctrl-G, e before executing it."
 commands = [
-  { pane = "presenter", command = "ls -lah" },
+  { pane = "presenter", command = "ls -lah", title = "Project files", scheme = "forest" },
   { pane = "observer", command = "printf 'Docs: https://ratatui.rs\\n'" },
 ]
 

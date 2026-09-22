@@ -60,9 +60,9 @@ automatically, including demo.toml. Relative paths resolve from the launch
 directory.
 .TP
 \fB\-\-check\fR
-Validate TOML syntax, pane count, names, weights, and command targets without
-spawning shells. With no \-\-config, checks the built\-in demo. Does not
-verify shell paths, working directories, or command syntax.
+Validate TOML syntax, pane count, IDs, titles, weights, and command targets
+without spawning shells. With no \-\-config, checks the built\-in demo. Does
+not verify shell paths, working directories, or command syntax.
 .TP
 \fB\-\-init\fR \fI<PATH>\fR
 Write a starter demo using $SHELL (or /bin/sh) and exit. The destination must
@@ -239,18 +239,28 @@ layout (columns, rows, or grid), panes, and
 queues. Omitted panes and queues independently retain the built-in defaults.
 Use queues = [] for an interactive-only demo with custom panes.
 .PP
-Each pane table has name (unique title/identity), shell, args, optional cwd,
+Each pane table has id (unique identity), optional title (display label),
+shell, args, optional cwd,
 scheme (ocean, ember, forest, mono), and weight (1 to 1000). There must be 1
 to 16
 panes. The shell defaults to SHELL or /bin/sh; args defaults to an empty
 array;
-name defaults to shell; scheme defaults to ocean; weight defaults to 1.
+id defaults to shell; title defaults to id; scheme defaults to ocean; weight
+defaults to 1.
 .PP
 Each queue table requires a nonempty name and one or more commands, with at
 most one command per pane within that queue. Repeated targets are rejected.
 The same pane may be used in another queue. Each queue has an
-optional description. Each command requires pane (an existing pane name) and
+optional description. Each command requires pane (an existing pane ID) and
 command (nonempty single-line input, with no NUL, CR, or LF).
+Optional command title and scheme change the target pane when sent or typed,
+without changing its ID or restarting its shell. Overrides persist until
+changed;
+preview and skip do not apply them. Titles must be nonempty without control
+characters.
+Saving preserves initial pane settings and cue overrides; full-demo apply
+restores
+initial appearance. Legacy pane name is an alias for id; do not specify both.
 .PP
 Paths are relative to the launch directory; configured paths do not expand
 shell variables or tilde. The --check option validates structure and
@@ -295,7 +305,7 @@ Each advance sends one command plus Enter to the target pane's current
 foreground
 program. Wait for a shell prompt; there is no completion detection or
 scheduler.
-Changing a pane's name, shell, args, or cwd starts a replacement session.
+Changing a pane's id, shell, args, or cwd starts a replacement session.
 Closing panes signals their shells; deliberately detached jobs may outlive
 them.
 .PP

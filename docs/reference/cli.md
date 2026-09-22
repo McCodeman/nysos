@@ -32,9 +32,9 @@ Options:
           directory.
 
       --check
-          Validate TOML syntax, pane count, names, weights, and command targets without
-          spawning shells. With no --config, checks the built-in demo. Does not verify
-          shell paths, working directories, or command syntax.
+          Validate TOML syntax, pane count, IDs, titles, weights, and command targets
+          without spawning shells. With no --config, checks the built-in demo. Does not
+          verify shell paths, working directories, or command syntax.
 
       --init <PATH>
           Write a starter demo using $SHELL (or /bin/sh) and exit. The destination must

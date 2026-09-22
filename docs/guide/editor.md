@@ -30,10 +30,11 @@ cancels the editing operation. Saved files are normalized TOML; comments are not
 preserved.
 
 Applying a full demo resets queue progress. Existing sessions are retained when
-name, shell, arguments, and working directory match. Changing those fields
+ID, shell, arguments, and working directory match. Changing those fields
 starts replacement sessions; removing panes closes them. Editing only
-colors, layout weights, or queues does not restart matching shells. Since `name`
-is also a pane's identity, changing a name starts a new shell. Use the modal to
+titles, colors, layout weights, or queues does not restart matching shells.
+`id` is a pane's stable identity; `title` is its display label. Legacy `name`
+is accepted as an alias for `id`. Use the modal to
 save ad hoc panes, resized layouts, and edited queues for your next presentation.
 
 Press **e** in the cue list to edit the selected item. **Prefix, e** edits that
@@ -62,7 +63,7 @@ Use the full demo editor to save edited cues, sidebar visibility, and width.
    ]
    ```
 
-   Use an existing pane name in each command. Each cue needs at least one
+   Use an existing pane ID in each command. Each cue needs at least one
    command and may target each pane only once. To remove a cue, remove its whole `[[queues]]` block.
 5. Press **Ctrl-S** (or **F3**), choose a save path, and press **Enter** to save
    and apply. **Ctrl-G** (or **F4**) applies without saving. **Esc** cancels.
@@ -114,3 +115,24 @@ If a correctly received key leaves the full editor open, read the validation
 error below the text. Include the displayed input, mode, error (if any), and
 whether you are using tmux or SSH when reporting the problem. Exit and relaunch
 without `--debug-keys` to hide the diagnostic line.
+
+## Change pane titles and themes per cue
+
+Run `nysos --config examples/pane-transitions.toml` from the source checkout for
+a six-cue example. It updates each pane independently, then updates both together;
+it also demonstrates title-only and theme-only overrides alongside new commands.
+
+In the cue editor (`e`), add `title` and/or `scheme` to a command:
+
+```toml
+name = "Inspect logs"
+commands = [
+  { pane = "presenter", command = "tail -20 app.log", title = "Server logs", scheme = "forest" },
+]
+```
+
+`pane` always refers to the stable ID from `[[panes]]`. The title and theme change
+when you run or type the command, and persist until another command changes them.
+Preview and skip leave the appearance unchanged. To set the initial title, edit
+`title` under `[[panes]]` in the full demo editor. Saving retains those initial
+values plus the cue overrides; applying the full demo restores its initial appearance.

@@ -70,6 +70,7 @@ verify: ## Check formatting, lint, tests, demo config, and generated references
 	$(CARGO) clippy --locked --all-targets -- -D warnings
 	$(CARGO) test --locked
 	$(CARGO) run --locked -- --config examples/demo.toml --check
+	$(CARGO) run --locked -- --config examples/pane-transitions.toml --check
 	$(MAKE) docs-check
 
 hooks: ## Activate the pre-commit hook for this Git repository

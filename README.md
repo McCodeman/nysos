@@ -72,7 +72,33 @@ nysos --add-to-path --install-completions
 
 Use the binary's full path if it is not yet on PATH. Reopen your terminal afterward.
 
+Pane commands target a stable `id`; `title` controls the visible label. Each cue's
+commands can override `title` and `scheme` without restarting the pane:
+
+```toml
+[[panes]]
+id = "server"
+title = "Server shell"
+scheme = "ocean"
+
+[[queues]]
+name = "Inspect logs"
+commands = [
+  { pane = "server", command = "tail -20 app.log", title = "Server logs", scheme = "forest" },
+]
+```
+
 ## Documentation
+
+Try the [pane transitions demo](examples/pane-transitions.toml) for six cues that
+change titles and themes independently in two live shells:
+
+```sh
+nysos --config examples/pane-transitions.toml
+```
+
+It includes updates to one pane, both panes, just a title, and just a theme.
+Press Enter in the cue list to run each cue; omitted panes keep their state.
 
 - [Getting started](docs/guide/getting-started.md)
 - [PATH and Bash/Zsh completions](docs/guide/shell-setup.md)

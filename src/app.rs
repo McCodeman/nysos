@@ -185,7 +185,7 @@ impl App {
             let title = format!(
                 " {} · {}{} ",
                 i + 1,
-                pane.config.name,
+                pane.config.display_title(),
                 if pane.exited { " [exited]" } else { "" }
             );
             frame.render_widget(
@@ -234,8 +234,12 @@ impl App {
                     width,
                     height,
                 );
-                let (next, count) = self.pane_preview(&pane.config.name);
-                let title = format!(" Preview · {} · {} pending ", pane.config.name, count);
+                let (next, count) = self.pane_preview(&pane.config.id);
+                let title = format!(
+                    " Preview · {} · {} pending ",
+                    pane.config.display_title(),
+                    count
+                );
                 let text = next.unwrap_or("No pending command for this cue");
                 frame.render_widget(Clear, area);
                 frame.render_widget(
@@ -428,7 +432,7 @@ impl App {
                         }
                         KeyCode::Char('x') if !self.cues.focused => {
                             self.panes[self.active] =
-                                Pane::spawn(self.demo.panes[self.active].clone())?
+                                Pane::spawn(self.panes[self.active].config.clone())?
                         }
                         KeyCode::Char('?') => self.help = true,
                         KeyCode::Char(c @ '1'..='9') => {
@@ -512,7 +516,7 @@ impl App {
             .iter()
             .enumerate()
             .filter_map(|(index, pane)| {
-                self.pane_preview(&pane.config.name)
+                self.pane_preview(&pane.config.id)
                     .0
                     .map(|command| (index, command.to_owned()))
             })
@@ -531,12 +535,18 @@ impl App {
             if pane.exited {
                 bail!(
                     "Pane '{}' has exited; restart it before typing this cue",
-                    pane.config.name
+                    pane.config.id
                 );
             }
         }
         for (index, command) in &commands {
             self.panes[*index].paste(command)?;
+            let action = self.demo.queues[self.cues.selected]
+                .commands
+                .iter()
+                .find(|action| action.pane == self.panes[*index].config.id)
+                .expect("validated target");
+            self.panes[*index].config.apply_command_style(action);
         }
         self.active = *first;
         self.cues.focused = false;
@@ -603,7 +613,7 @@ impl App {
             let pane = self
                 .panes
                 .iter_mut()
-                .find(|p| p.config.name == command.pane)
+                .find(|p| p.config.id == command.pane)
                 .expect("validated target");
             pane.pump()?;
             if pane.exited {
@@ -632,9 +642,10 @@ impl App {
             let pane = self
                 .panes
                 .iter_mut()
-                .find(|p| p.config.name == command.pane)
+                .find(|p| p.config.id == command.pane)
                 .expect("validated target");
             pane.write(format!("{}\r", command.command).as_bytes())?;
+            pane.config.apply_command_style(command);
         }
         self.status.clear();
         self.command += 1;
@@ -653,10 +664,10 @@ impl App {
         }
         let name = (1..)
             .map(|n| format!("adhoc-{n}"))
-            .find(|n| !self.demo.panes.iter().any(|p| p.name == *n))
+            .find(|n| !self.demo.panes.iter().any(|p| p.id == *n))
             .unwrap();
         let config = PaneConfig {
-            name,
+            id: name,
             ..Default::default()
         };
         let pane = Pane::spawn(config.clone())?;
@@ -673,24 +684,24 @@ impl App {
         let mut replacements = HashMap::new();
         for config in &demo.panes {
             let reuse = self.panes.iter().any(|p| {
-                p.config.name == config.name
+                p.config.id == config.id
                     && p.config.shell == config.shell
                     && p.config.args == config.args
                     && p.config.cwd == config.cwd
             });
             if !reuse {
-                replacements.insert(config.name.clone(), Pane::spawn(config.clone())?);
+                replacements.insert(config.id.clone(), Pane::spawn(config.clone())?);
             }
         }
         let mut old: HashMap<_, _> = self
             .panes
             .drain(..)
-            .map(|p| (p.config.name.clone(), p))
+            .map(|p| (p.config.id.clone(), p))
             .collect();
         for config in &demo.panes {
             let mut pane = replacements
-                .remove(&config.name)
-                .or_else(|| old.remove(&config.name))
+                .remove(&config.id)
+                .or_else(|| old.remove(&config.id))
                 .expect("prepared pane");
             pane.config = config.clone();
             self.panes.push(pane);
@@ -765,8 +776,7 @@ impl App {
                     EditorKind::Demo => self.apply(Demo::parse(&editor.content())?)?,
                     EditorKind::Queue(index) => {
                         let queue: Queue = toml::from_str(&editor.content())?;
-                        queue
-                            .validate(&self.demo.panes.iter().map(|p| p.name.as_str()).collect())?;
+                        queue.validate(&self.demo.panes.iter().map(|p| p.id.as_str()).collect())?;
                         self.demo.queues[index] = queue;
                         if index == self.queue {
                             self.command = 0;
@@ -909,7 +919,7 @@ fn open_url(url: &str) -> Result<()> {
     });
     Ok(())
 }
-const HELP: &str = "Every pane is a live PTY shell. Type normally; Ctrl-C reaches the shell.\n\nPress Ctrl-G, release, then:\n  n / Enter    Send the next command and advance\n  s            Skip the next command\n  e            Edit current queue item before running it\n  o            Edit full demo (title, add/reorder cues, panes, layout)\n  a            Add and focus an ad hoc shell\n  Tab / →      Focus next pane; Shift-Tab / ← goes back\n  0            Show and focus the cue list\n  c            Show/hide the cue list\n  1–9          Focus shell pane by number\n  l / h        Cycle layout / toggle header\n  x            Restart focused shell (ends its current session)\n  q            Quit and close all shells\n\nIn Cues: ↑/↓ browse, Enter sends the selected cue, e edits it; o edits the entire demo.\np previews the next command per pane; Esc closes, arrows scroll.\nt types those commands without Enter, then focuses the first target shell.\nTab/Esc returns to a shell. Enter resumes a partially sent current cue.\nCommands are dispatched in order without waiting for completion.\n\nAlt-Left/Right rotates focus, including Cues. Ghostty mappings also accept Alt-B/F. Click a pane to focus.\nDrag a shared border to resize. Grid rows are equal height.\nScroll wheel uses scrollback; Shift-wheel overrides application mouse mode.\nAlt-click opens HTTP(S) links. Cmd-click works locally on macOS outside tmux when the host forwards the click.\nOver SSH, URL openers run on the remote host.\n\nEditor: Ctrl-L load, Ctrl-S save as, Ctrl-G apply, Esc cancel.\nLoading previews the file; applying resets queue progress. Changing a pane\nname/shell/args/cwd creates a new session. Removed sessions are closed.\nCommands are sent to the pane's current foreground program: wait for its\nprompt before running the next command. No automatic completion detection.";
+const HELP: &str = "Every pane is a live PTY shell. Type normally; Ctrl-C reaches the shell.\n\nPress Ctrl-G, release, then:\n  n / Enter    Send the next command and advance\n  s            Skip the next command\n  e            Edit current queue item before running it\n  o            Edit full demo (title, add/reorder cues, panes, layout)\n  a            Add and focus an ad hoc shell\n  Tab / →      Focus next pane; Shift-Tab / ← goes back\n  0            Show and focus the cue list\n  c            Show/hide the cue list\n  1–9          Focus shell pane by number\n  l / h        Cycle layout / toggle header\n  x            Restart focused shell (ends its current session)\n  q            Quit and close all shells\n\nIn Cues: ↑/↓ browse, Enter sends the selected cue, e edits it; o edits the entire demo.\np previews the next command per pane; Esc closes, arrows scroll.\nt types those commands without Enter, then focuses the first target shell.\nTab/Esc returns to a shell. Enter resumes a partially sent current cue.\nCommands are dispatched in order without waiting for completion.\n\nAlt-Left/Right rotates focus, including Cues. Ghostty mappings also accept Alt-B/F. Click a pane to focus.\nDrag a shared border to resize. Grid rows are equal height.\nScroll wheel uses scrollback; Shift-wheel overrides application mouse mode.\nAlt-click opens HTTP(S) links. Cmd-click works locally on macOS outside tmux when the host forwards the click.\nOver SSH, URL openers run on the remote host.\n\nEditor: Ctrl-L load, Ctrl-S save as, Ctrl-G apply, Esc cancel.\nLoading previews the file; applying resets queue progress. Changing a pane\nid/shell/args/cwd creates a new session. Removed sessions are closed.\nCommands are sent to the pane's current foreground program: wait for its\nprompt before running the next command. No automatic completion detection.";
 
 #[cfg(all(test, unix))]
 mod tests {
@@ -926,6 +936,66 @@ mod tests {
     }
     fn key(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
         app.event(Event::Key(KeyEvent::new(code, modifiers)));
+    }
+    #[test]
+    fn cue_styles_apply_only_on_dispatch_and_preserve_identity() {
+        use crate::config::Scheme;
+        let mut app = app();
+        let first = &mut app.demo.queues[0].commands[0];
+        first.title = Some("Server logs".into());
+        first.scheme = Some(Scheme::Forest);
+        first.command = "export NYSOS_STYLE_TEST=preserved".into();
+        let mut next = app.demo.queues[0].clone();
+        next.commands.truncate(1);
+        next.commands[0].title = Some("Server health".into());
+        next.commands[0].scheme = Some(Scheme::Mono);
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("session");
+        next.commands[0].command =
+            format!("printf '%s' \"$NYSOS_STYLE_TEST\" > '{}'", path.display());
+        app.demo.queues.push(next);
+        app.cues.focused = true;
+        key(&mut app, KeyCode::Char('p'), KeyModifiers::NONE);
+        assert_eq!(app.panes[0].config.display_title(), "presenter");
+        key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
+        app.step(false).unwrap();
+        assert_eq!(app.panes[0].config.id, "presenter");
+        assert_eq!(app.panes[0].config.display_title(), "Server logs");
+        assert_eq!(app.panes[0].config.scheme, Scheme::Forest);
+        assert_eq!(app.demo.panes[0].display_title(), "presenter");
+        let mut terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
+        app.resize(Rect::new(0, 0, 100, 30)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        let screen: String = terminal
+            .backend()
+            .buffer()
+            .content
+            .iter()
+            .map(|c| c.symbol())
+            .collect();
+        assert!(screen.contains("Server logs"));
+        app.step(true).unwrap(); // Skip observer; no effect on presenter styling.
+        app.cues.selected = 1;
+        app.execute_selected().unwrap();
+        assert_eq!(app.panes[0].config.display_title(), "Server health");
+        assert_eq!(app.panes[0].config.scheme, Scheme::Mono);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+        while std::fs::read_to_string(&path).ok().as_deref() != Some("preserved") {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "styling replaced the shell session"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        app.apply(app.demo.clone()).unwrap();
+        assert_eq!(app.panes[0].config.display_title(), "presenter");
+        app.step(true).unwrap(); // Skipping an explicitly styled command does not apply it.
+        assert_eq!(app.panes[0].config.scheme, Scheme::Ocean);
+        app.cues.selected = 1;
+        app.type_selected().unwrap();
+        assert_eq!(app.panes[0].config.display_title(), "Server health");
+        assert_eq!(app.panes[0].config.scheme, Scheme::Mono);
+        assert_eq!((app.queue, app.command), (0, 1));
     }
     #[test]
     fn key_diagnostic_shows_received_control_and_active_popup() {
@@ -990,6 +1060,7 @@ mod tests {
             commands: vec![DemoCommand {
                 pane: "observer".into(),
                 command: "printf edited".into(),
+                ..Default::default()
             }],
         };
         app.editor = Some(Editor::new(
@@ -1015,6 +1086,7 @@ mod tests {
             .map(|(pane, path)| DemoCommand {
                 pane: pane.into(),
                 command: format!("printf original > '{}'", path.display()),
+                ..Default::default()
             })
             .collect();
         app.cues.focused = true;
@@ -1050,10 +1122,12 @@ mod tests {
             DemoCommand {
                 pane: "presenter".into(),
                 command: "echo preview-first".into(),
+                ..Default::default()
             },
             DemoCommand {
                 pane: "observer".into(),
                 command: "echo preview-second".into(),
+                ..Default::default()
             },
         ];
         app.demo.queues.push(app.demo.queues[0].clone());
@@ -1165,10 +1239,12 @@ mod tests {
             DemoCommand {
                 pane: "presenter".into(),
                 command: output(&first, "skipped"),
+                ..Default::default()
             },
             DemoCommand {
                 pane: "observer".into(),
                 command: output(&second, "sent"),
+                ..Default::default()
             },
         ];
         app.demo.validate().unwrap();

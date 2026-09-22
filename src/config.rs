@@ -8,12 +8,16 @@ use std::{collections::HashSet, path::Path};
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Demo {
+    pub features: Vec<crate::features::Feature>,
+    pub line_numbers: bool,
     pub title: String,
     pub prefix: crate::prefix::Prefix,
     pub terminal_keys: crate::prefix::TerminalKeys,
     pub header: bool,
     pub cue_list: bool,
     pub cue_width: u16,
+    #[serde(rename = "loop")]
+    pub loop_cues: bool,
     pub layout: Layout,
     pub panes: Vec<PaneConfig>,
     pub queues: Vec<Queue>,
@@ -163,6 +167,7 @@ impl Layout {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct PaneConfig {
+    pub line_numbers: Option<bool>,
     #[serde(alias = "name")]
     pub id: String,
     pub title: Option<String>,
@@ -192,18 +197,57 @@ pub struct Queue {
     pub description: String,
     pub commands: Vec<Command>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub advance_after_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub layout: Option<Layout>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Command {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub line_numbers: Option<bool>,
     pub pane: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub command: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub keys: Vec<KeyPress>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub clear: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scheme: Option<Scheme>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct KeyPress {
+    pub key: String,
+    #[serde(default = "one")]
+    pub repeat: u16,
+}
+fn one() -> u16 {
+    1
+}
+
+impl Command {
+    pub fn preview(&self) -> String {
+        if self.clear {
+            return "Clear pane (native)".into();
+        }
+        if !self.keys.is_empty() {
+            return format!(
+                "Send keys: {}",
+                self.keys
+                    .iter()
+                    .map(|key| format!("{} × {}", key.key, key.repeat))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+        }
+        self.command.clone()
+    }
 }
 
 fn validate_pane_title(title: Option<&str>) -> Result<()> {
@@ -219,6 +263,9 @@ impl PaneConfig {
     }
 
     pub fn apply_command_style(&mut self, command: &Command) {
+        if let Some(show) = command.line_numbers {
+            self.line_numbers = Some(show);
+        }
         if let Some(title) = &command.title {
             self.title = Some(title.clone());
         }
@@ -231,6 +278,7 @@ impl PaneConfig {
 impl Default for PaneConfig {
     fn default() -> Self {
         Self {
+            line_numbers: None,
             id: "shell".into(),
             title: None,
             shell: std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".into()),
@@ -245,12 +293,15 @@ impl Default for PaneConfig {
 impl Default for Demo {
     fn default() -> Self {
         Self {
+            features: crate::features::defaults(),
+            line_numbers: false,
             title: "nysos demo".into(),
             prefix: crate::prefix::Prefix::default(),
             terminal_keys: crate::prefix::TerminalKeys::Auto,
             header: true,
             cue_list: true,
             cue_width: 26,
+            loop_cues: false,
             layout: Layout::default(),
             panes: vec![
                 PaneConfig {
@@ -367,6 +418,12 @@ impl Queue {
         if self.name.trim().is_empty() || self.commands.is_empty() {
             bail!("Each queue needs a name and at least one command");
         }
+        if self
+            .advance_after_ms
+            .is_some_and(|ms| !(1..=86_400_000).contains(&ms))
+        {
+            bail!("advance_after_ms must be between 1 and 86400000");
+        }
         let mut targets = HashSet::new();
         for command in &self.commands {
             if !targets.insert(command.pane.as_str()) {
@@ -380,7 +437,27 @@ impl Queue {
                 bail!("Unknown pane: {}", command.pane);
             }
             validate_pane_title(command.title.as_deref())?;
-            if command.command.trim().is_empty() || command.command.contains(['\0', '\r', '\n']) {
+            let actions = usize::from(!command.command.is_empty())
+                + usize::from(!command.keys.is_empty())
+                + usize::from(command.clear);
+            if actions != 1 {
+                bail!("Each pane entry needs exactly one of command, keys, or clear = true");
+            }
+            let mut presses = 0usize;
+            for key in &command.keys {
+                crate::input::parse_key(&key.key)?;
+                if key.repeat == 0 {
+                    bail!("Key repeat must be at least 1");
+                }
+                presses += usize::from(key.repeat);
+            }
+            if presses > 4096 {
+                bail!("A pane entry allows at most 4096 key presses");
+            }
+            if !command.command.is_empty()
+                && (command.command.trim().is_empty()
+                    || command.command.contains(['\0', '\r', '\n']))
+            {
                 bail!(
                     "Commands must be nonempty single lines; use shell separators for compound commands"
                 );
@@ -413,6 +490,7 @@ pub fn test_shell_args() -> Vec<String> {
 pub fn test_demo() -> Demo {
     Demo {
         queues: vec![Queue {
+            advance_after_ms: None,
             layout: None,
             name: "Welcome".into(),
             description: "Edit, run or skip these commands; every pane is a live shell.".into(),
@@ -436,6 +514,65 @@ pub fn test_demo() -> Demo {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn line_number_gate_defaults_on_but_visibility_defaults_off() {
+        assert_eq!(
+            Demo::default().features,
+            [crate::features::Feature::LineNumbers]
+        );
+        assert_eq!(
+            Demo::parse("").unwrap().features,
+            crate::features::defaults()
+        );
+        assert!(Demo::parse("features = []").unwrap().features.is_empty());
+        let builtin = Demo::builtin().unwrap();
+        assert!(
+            builtin
+                .features
+                .contains(&crate::features::Feature::LineNumbers)
+        );
+        assert!(!Demo::default().line_numbers);
+        assert!(!Demo::parse("").unwrap().line_numbers);
+        assert!(!builtin.line_numbers);
+        assert!(
+            builtin
+                .panes
+                .iter()
+                .all(|pane| !pane.line_numbers.unwrap_or(builtin.line_numbers))
+        );
+        assert!(Demo::parse("features = ['unknown']").is_err());
+        let demo = Demo::parse("features = ['line-numbers']\nline_numbers = false\n[[panes]]\nid = 'shell'\nline_numbers = true").unwrap();
+        assert_eq!(demo.features, [crate::features::Feature::LineNumbers]);
+        assert!(!demo.line_numbers);
+        assert_eq!(demo.panes[0].line_numbers, Some(true));
+    }
+    #[test]
+    fn action_validation_and_round_trip() {
+        let mut demo = test_demo();
+        demo.loop_cues = true;
+        demo.queues[0].advance_after_ms = Some(250);
+        demo.queues[0].commands[0].command.clear();
+        demo.queues[0].commands[0].keys = vec![KeyPress {
+            key: "Ctrl+C".into(),
+            repeat: 4,
+        }];
+        demo.queues[0].commands[1].command.clear();
+        demo.queues[0].commands[1].clear = true;
+        let saved = toml::to_string_pretty(&demo).unwrap();
+        let loaded = Demo::parse(&saved).unwrap();
+        assert!(loaded.loop_cues);
+        assert_eq!(loaded.queues[0].commands[0].keys[0].repeat, 4);
+        demo.queues[0].commands[0].keys[0].repeat = 0;
+        assert!(demo.validate().is_err());
+        demo.queues[0].commands[0].keys[0].repeat = 4097;
+        assert!(demo.validate().is_err());
+        demo.queues[0].commands[0].keys[0].repeat = 1;
+        demo.queues[0].commands[0].command = "pwd".into();
+        assert!(demo.validate().is_err());
+        demo.queues[0].commands[0].command.clear();
+        demo.queues[0].advance_after_ms = Some(0);
+        assert!(demo.validate().is_err());
+    }
     #[test]
     fn nested_layout_round_trip_and_validation() {
         let demo = Demo::parse(include_str!("../examples/nested-layout.toml")).unwrap();

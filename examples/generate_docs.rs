@@ -4,6 +4,9 @@
 //! Generate checked-in references from the executable's CLI definition.
 #[path = "../src/cli.rs"]
 mod cli;
+#[path = "../src/features.rs"]
+#[allow(dead_code)]
+mod features;
 #[path = "../src/prefix.rs"]
 #[allow(dead_code)]
 mod prefix;

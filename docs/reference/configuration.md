@@ -19,10 +19,11 @@ inside panes, queues, and commands.
 
 | Location | All valid keys |
 | --- | --- |
-| Top level | `title`, `prefix`, `terminal_keys`, `header`, `cue_list`, `cue_width`, `layout`, `panes`, `queues` |
-| Each `[[panes]]` | `id`, `name` (legacy alias for `id`), `title`, `shell`, `args`, `cwd`, `scheme`, `weight` |
-| Each `[[queues]]` | `name`, `description`, `commands` |
-| Each command in a queue | `pane`, `command`, `title`, `scheme` |
+| Top level | `features`, `line_numbers`, `title`, `prefix`, `terminal_keys`, `header`, `cue_list`, `cue_width`, `loop`, `layout`, `panes`, `queues` |
+| Each `[[panes]]` | `id`, `name` (legacy alias for `id`), `title`, `shell`, `args`, `cwd`, `scheme`, `weight`, `line_numbers` |
+| Each `[[queues]]` | `name`, `description`, `commands`, `layout`, `advance_after_ms` |
+| Each command in a queue | `pane`, `command`, `keys`, `clear`, `title`, `scheme`, `line_numbers` |
+| Each item in `keys` | `key`, `repeat` |
 
 A **cue** in the UI is a `[[queues]]` item in TOML; `cues` is not an alias.
 Pane count comes from the number of `[[panes]]` entries, not a `pane_count`
@@ -82,11 +83,14 @@ commands = [
 
 | Field | Type | Default when omitted | Meaning |
 | --- | --- | --- | --- |
+| `features` | Array of string enums | `["line-numbers"]` | Enabled experimental gates. Currently only `"line-numbers"`; use `[]` to disable all gates. An explicit array replaces the defaults. Unknown names fail validation. CLI enables merge into this list, then disables remove entries. |
+| `line_numbers` | Boolean | `false` | Default gutter visibility, effective only with the `line-numbers` gate. Individual panes may override it. |
 | `title` | String | `"nysos demo"` | Nonempty demo title displayed above cue details when the header is enabled; control characters are rejected. |
 | `terminal_keys` | String enum | `"auto"` | `"auto"` detects Ghostty using TERM_PROGRAM/TERM; `"ghostty"` adds Alt-B/F focus aliases; `"standard"` preserves those shell keys. `--terminal-keys` overrides at startup. |
 | `prefix` | String enum | `"ctrl-g"` | Control prefix: `"ctrl-g"`, `"ctrl-a"`, `"ctrl-b"`, or `"f12"`. `--prefix` overrides it at startup. |
 | `header` | Boolean | `true` | Show the demo title, cue index/name/description, and total command count above the panes. When the cue list is focused, show its selection. |
 | `cue_list` | Boolean | `true` | Initially show and focus the left cue sidebar. Set `false` to hide it and focus the first shell. Toggle with Ctrl-G, c. |
+| `loop` | Boolean | `false` | Wrap playback to the first cue after the last. Does not start playback automatically. |
 | `cue_width` | Integer | `26` | Sidebar width including borders, 16–60 columns; capped at half the content width in small terminals. |
 | `layout` | String or layout table | `"columns"` | Preset `"columns"`, `"rows"`, `"grid"`, or a nested split tree (below). |
 | `panes` | Array of pane tables | Built-in `presenter` and `observer` panes | Between 1 and 16 pane definitions; their count determines pane count. |
@@ -148,7 +152,7 @@ is not refreshed on tmux reattachment. The active profile appears in help.
 
 `--prefix` and `--terminal-keys` override their TOML values at startup. Editing
 or loading a full demo afterward uses that demo's values, and saving writes the
-current values. Other configuration fields have no corresponding CLI overrides.
+current values. Feature gates also have startup `--enable-feature` / `--disable-feature` overrides. Other configuration fields have no corresponding CLI overrides.
 See [tmux and SSH](../guide/tmux-ssh.md) for examples.
 
 ## Pane fields: `[[panes]]`
@@ -162,6 +166,7 @@ See [tmux and SSH](../guide/tmux-ssh.md) for examples.
 | `args` | Array of strings | `[]` | Arguments passed directly to the shell executable, e.g. `["-l"]`. |
 | `cwd` | String | Inherit launch directory | Working directory for this pane. Omit for inheritance; TOML has no null value. |
 | `scheme` | String enum | `"ocean"` | `"ocean"`, `"ember"`, `"forest"`, or `"mono"`. |
+| `line_numbers` | Boolean | Inherit top-level setting | Initial gutter visibility for this pane; requires the `line-numbers` gate. |
 | `weight` | Integer | `1` | Relative size from 1 through 1000 for preset layouts. Nested layouts use weights on tree nodes instead. |
 
 Give every pane an explicit ID: two panes that omit `id` (and its legacy alias
@@ -262,7 +267,8 @@ are rendered separately. Custom RGB theme definitions are not supported yet.
 | --- | --- | --- | --- |
 | `name` | String | Required | Label in the cue list and header; cannot be empty or whitespace-only. Cue names need not be unique. |
 | `description` | String | `""` | Free-form presenter-facing text in the header; empty or multiline text is accepted, but the fixed-height header can clip long text. |
-| `commands` | Array of command tables | Required | One or more commands, sent in listed order; each pane may appear at most once per cue. |
+| `commands` | Array of action tables | Required | One or more actions, dispatched in listed order; each pane may appear at most once per cue. |
+| `advance_after_ms` | Integer | No timer | 1–86400000 milliseconds after dispatch completes, execute the next cue. At the end, wrap only if `loop = true`. |
 | `layout` | Preset string or layout tree | Keep the active layout | Same schema as top-level `layout`. Applies on first dispatched command or `t`, with node weights controlling per-cue sizing. |
 
 Ctrl-G, n sends a single command. Enter in the cue sidebar sends all remaining
@@ -281,7 +287,10 @@ to a fresh shell. Do not assume completion before sending the next command.
 | Field | Type | Default when omitted | Meaning / validation |
 | --- | --- | --- | --- |
 | `pane` | String | Required | Exact ID of an existing pane; never its display title. |
-| `command` | String | Required | Nonempty single-line shell input; NUL, CR, and LF are rejected. |
+| `command` | String | Absent | Nonempty single-line shell input; NUL, CR, and LF are rejected. Mutually exclusive with `keys` and `clear = true`. |
+| `keys` | Array of key tables | `[]` | Ordered key presses; each table has required `key` and optional `repeat`. Mutually exclusive with command/clear. |
+| `line_numbers` | Boolean | Keep current pane setting | Show/hide the target gutter before dispatch or typing; requires the `line-numbers` gate. Resizes the PTY before bookmarking/sending input. |
+| `clear` | Boolean | `false` | Clear the pane terminal display directly, without sending shell input. Mutually exclusive with command/keys. |
 | `title` | String | Keep current pane title | Change the target pane’s display title when dispatched; nonempty with no control characters. |
 | `scheme` | String enum | Keep current pane scheme | Change the target pane’s theme: `"ocean"`, `"ember"`, `"forest"`, or `"mono"`. |
 
@@ -291,7 +300,9 @@ pane and preserve its ID, shell, and scrollback. Subsequent cues keep the curren
 values unless they explicitly override them. Browsing, previewing, and skipping
 commands do not apply styling. If jumping between cues, specify both fields when
 a cue needs a particular appearance regardless of the previously executed cue.
-Commands remain required; these overrides do not create styling-only commands.
+Exactly one action is required: a nonempty `command`, nonempty `keys`, or
+`clear = true`. Styling-only entries are not supported. The one-entry-per-pane
+rule also applies to key and clear actions.
 
 Runtime overrides are not written back into the initial `[[panes]]` definitions.
 Saving preserves the initial pane configuration and the overrides in each cue.
@@ -435,3 +446,98 @@ demo to persist either. Node weights provide per-cue sizing; pane-table weights
 remain shared defaults for the preset layouts. Adding an ad hoc pane extends all
 explicit trees, including layouts in future cues. Removing a pane manually
 requires removing it from every tree and its command targets.
+
+## Key actions, timers, and native clear
+
+```toml
+loop = true # Top level, before any tables.
+
+[[panes]]
+id = "worker"
+
+[[queues]]
+name = "Interrupt the foreground process"
+advance_after_ms = 1500
+commands = [
+  { pane = "worker", keys = [{ key = "Ctrl+C" }, { key = "<esc>", repeat = 2 }] },
+]
+
+[[queues]]
+name = "Clear the display"
+advance_after_ms = 3000
+commands = [{ pane = "worker", clear = true }]
+```
+
+Each key table accepts only:
+
+| Field | Type | Default | Validation |
+| --- | --- | --- | --- |
+| `key` | String | Required | A portable terminal key name or a literal Unicode character. |
+| `repeat` | Integer | `1` | 1–4096; all repeats in one pane entry together must total at most 4096. |
+
+Names are case-insensitive: `Esc`/`Escape`, `Enter`/`Return`, `Tab`, `BackTab`,
+`Backspace`, `Space`, `Up`, `Down`, `Left`, `Right`, `Home`, `End`, `PageUp`,
+`PageDown`, `Insert`, `Delete`, and `F1`–`F12`. Optional enclosing angle brackets
+are accepted (`<esc>`). Literal characters retain case, including Unicode and `+`.
+Prefix a name with `Ctrl+`/`Control+`, `Alt+`/`Option+`, or `Shift+`;
+combine them for cursor, navigation, and function keys. `Shift+Tab` is BackTab.
+For characters, use the actual uppercase character/symbol instead of Shift.
+Ctrl characters accept ASCII letters, Space, `@`, `[`, `\`, `]`, `^`, `_`, `?`.
+Enter and Backspace support Alt only; Esc, Tab, and BackTab have no other
+modifier combinations. Command/Super and unsupported combinations are rejected
+by `--check`; these are terminal byte sequences, not operating-system key events.
+
+`keys = [{ key = "Ctrl+D" }]` sends EOF to a shell at an empty prompt and may
+close it. Keys go directly to the pane, bypassing nysos shortcuts. Arrow encoding
+honors the target application's cursor mode. Repeats are contiguous input, with
+no delay or completion detection between presses. Application-specific keymaps
+still determine their effect.
+
+Preview labels key actions as **Send keys**, includes every repeat count, and
+labels native clears separately. `t` immediately sends key and clear actions;
+for cues containing only these actions it advances exactly like Enter. In a
+mixed cue, `t` types command text without Enter, sends key/clear actions, focuses
+the first target shell, and leaves playback unchanged. Replaying that cue with
+Enter will send every action again; finish the typed commands in their shells
+and skip the cue's entries if repetition is unwanted.
+
+A timer starts after the last action is dispatched, including a prefix-n step
+that completes a cue. It executes the next cue without waiting for process
+completion. Skipping the final entry does not arm a timer. Plain startup does
+not start playback; run a cue first. A cue without `advance_after_ms` stops the
+automatic chain. Without looping, the final cue stops even if it has a timer;
+Enter can still replay it. With looping, the final cue selects the first, and its
+timer can execute that first cue again. A one-cue loop runs at most once per UI
+frame (approximately 16 ms); timers are best-effort, not real-time scheduling.
+
+Space in the cue list pauses/resumes an armed timer. Preview, help, and editor
+modals suspend its countdown. Browsing/selecting a cue or restoring a bookmark
+cancels automatic playback. Applying/editing configuration cancels it too. Errors
+stop automatic playback and appear in the status line. Focus changes alone do
+not pause playback; the countdown remains visible even with the header hidden.
+
+Native clear clears the emulator viewport and preserves normal scrollback and
+cursor position. It sends no command, keystroke, or signal to the process;
+it does not reset shell state or erase a partially typed line. A running program
+can redraw afterward. Alternate-screen programs do not provide normal history.
+
+Before dispatch, nysos records each target pane's execution line. Cue-list `s`
+returns those panes to the most recent recorded start of the selected cue;
+`b` returns **all** panes to the live bottom. Recording also happens with `t`.
+Bookmarks survive pane resizing, layout changes, gutter toggles, and text reflow.
+They are in-memory and expire on alternate-screen transitions, history deletion, pane replacement, or configuration edits. They
+also expire when their lines are evicted from the terminal’s 10,000-line history.
+Recent bookmarks continue working when history is full. Missing bookmarks leave panes unchanged and
+are reported in the status line. A line still on the live screen may not yet be
+scrollable to the top. These controls do not undo commands or rewind processes.
+
+See [`examples/key-playback.toml`](https://github.com/McCodeman/nysos/blob/main/examples/key-playback.toml)
+for a timed loop that interrupts a process, prints new output, and clears a pane.
+
+## Gated line-number gutters
+
+See [feature gates and line numbers](../guide/feature-gates.md) for precedence,
+live toggling with **prefix, #**, logical numbering, scrolling, mouse behavior,
+and experimental limits. Visibility settings are ignored when the gate is off.
+Saving after a keyboard toggle persists the focused pane's initial setting;
+per-cue overrides remain in their actions and may change it again during playback.

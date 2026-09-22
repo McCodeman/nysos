@@ -79,6 +79,8 @@ verify: license-check workflow-check ## Check formatting, lint, tests, demo conf
 	$(CARGO) run --locked -- --config examples/demo.toml --check
 	$(CARGO) run --locked -- --config examples/pane-transitions.toml --check
 	$(CARGO) run --locked -- --config examples/nested-layout.toml --check
+	$(CARGO) run --locked -- --config examples/key-playback.toml --check
+	$(CARGO) run --locked -- --config examples/line-numbers.toml --check
 	$(MAKE) docs-check
 
 hooks: ## Activate the pre-commit hook for this Git repository

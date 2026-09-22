@@ -153,3 +153,10 @@ layout. Node weights provide per-cue sizing. Preview/skip does not apply them;
 execution or `t` does. Once active, divider and keyboard resizing edits that
 cue's layout. Saving retains both global and cue layouts. Full-demo apply resets
 the active view to the global layout. Each tree must include every pane ID once.
+
+Cue entries also accept `keys = [{ key = "Ctrl+C", repeat = 1 }]` or `clear = true`
+instead of `command`. Edit `advance_after_ms` in a cue for automatic progression,
+and top-level `loop` in the full demo editor for playlist looping. Modal editors
+suspend the timer; applying an edit cancels it and discards scroll bookmarks.
+See the [configuration reference](../reference/configuration.md#key-actions-timers-and-native-clear)
+for validation and examples.

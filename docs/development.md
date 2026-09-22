@@ -192,6 +192,7 @@ The [manpage page](reference/manpage.md) explains local viewing and installation
 | --- | --- |
 | `src/cli.rs` | CLI definition and help text |
 | `src/main.rs` | Startup, terminal restoration, and event loop |
+| `src/features.rs` | Typed runtime feature-gate registry and startup override precedence |
 | `src/config.rs` | TOML schema, validation, and atomic saves |
 | `src/pane.rs` | PTY lifecycle, terminal parser, rendering, URLs |
 | `src/input.rs` | Keyboard and application mouse encoding |
@@ -387,3 +388,16 @@ to enter the environment; keeping it on 26.05 avoids falling back to macOS's
 old system Bash. Other platforms use the separately locked `nixpkgs-current`
 packages. The resize integration test waits for nysos's rendered pane corner
 after tmux resizes, so shell-size assertions wait for the application's redraw.
+
+## Experimental feature gates
+
+`src/features.rs` defines the closed `Feature` enum shared by CLI and TOML.
+Experimental behavior must be inert when its gate is disabled.
+`features::defaults()` defines the enabled defaults; currently `line-numbers` is
+on by default. Explicit TOML arrays replace that list, including `[]` to opt out. Add the variant, documentation, and tests
+for disabled behavior, enabled behavior, and CLI disable precedence. Gates are
+runtime settings; Cargo artifacts and packages contain the same capabilities.
+The full editor can change the list, and saves persist effective startup overrides.
+The line-number gate's geometry is centralized in `Pane::body_area` so rendering,
+PTY sizing, cursor placement, and mouse translation agree. `make test-tmux`
+checks live toggling and the child PTY width with the gate enabled.

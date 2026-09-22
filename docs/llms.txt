@@ -27,3 +27,5 @@ check `nysos --version-full` and `nysos --help` for the installed version.
 - [Installation](https://raw.githubusercontent.com/McCodeman/nysos/main/docs/guide/installation.md): Homebrew, Linux packages, source builds, and download installer.
 - [tmux and SSH](https://raw.githubusercontent.com/McCodeman/nysos/main/docs/guide/tmux-ssh.md): Remote terminal controls and limitations.
 - [Development](https://raw.githubusercontent.com/McCodeman/nysos/main/docs/development.md): Nix environment, checks, packaging, and release workflow.
+
+- [Feature gates and line numbers](guide/feature-gates.md): enabling gates, live toggles, and numbering limits.

@@ -5,6 +5,7 @@ mod app;
 mod cli;
 mod config;
 mod cues;
+mod features;
 mod input;
 mod layout;
 mod pane;
@@ -71,6 +72,11 @@ fn main() -> Result<()> {
     if let Some(profile) = args.terminal_keys {
         demo.terminal_keys = profile;
     }
+    features::apply_overrides(
+        &mut demo.features,
+        &args.enable_feature,
+        &args.disable_feature,
+    );
     demo.validate()?;
     if args.check {
         println!(

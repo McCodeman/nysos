@@ -37,7 +37,9 @@ The cue list is visible and focused at startup unless cue_list = false.
 In that list, Up/Down selects a cue, p previews its commands, Esc closes preview,
 Enter dispatches the selected cue, e edits that cue, and o edits the whole demo.
 t types commands without Enter and focuses the first target shell for editing.
-Type mode does not advance playback; confirm each target's line manually.
+For key/clear-only cues, t dispatches and advances exactly like Enter.
+For cues containing command text, type mode does not advance playback; confirm
+each target's line manually.
 
 The default prefix is Ctrl-G: press it, release it, then press the following key.
 It avoids macOS's reserved Ctrl-Space and tmux's default Ctrl-B prefix.
@@ -134,3 +136,43 @@ These raw Markdown links work both from this checkout and from built docs.
 - Source development: https://raw.githubusercontent.com/McCodeman/nysos/main/docs/development.md
 
 In a checkout, read the corresponding docs/ paths for changes not yet published.
+
+## Key actions and playback
+
+Each commands entry contains exactly one of command, keys, or clear = true.
+For example: { pane = "service", keys = [{ key = "Ctrl+C", repeat = 2 }] }.
+Use Esc, arrows, navigation keys, F1-F12, supported Ctrl/Alt/Shift combinations,
+or literal Unicode characters. Repeat defaults to 1; at most 4096 presses per
+pane entry. Preview labels key sequences and native clears. Native clear sends
+no shell input. Mixed cues with t send keys/clears and type commands without
+Enter, leaving progress unchanged; replay sends all actions again.
+
+A cue's advance_after_ms (1–86400000) executes the next cue after dispatch.
+Top-level loop = true wraps the playlist. Neither starts playback on launch.
+Space in Cues pauses/resumes an armed timer; modals suspend it, browsing cancels
+it, and configuration edits cancel it. There is no process-completion detection.
+
+In Cues, s restores that cue's most recent execution-line bookmarks; b scrolls
+all panes to live bottom. Bookmarks survive layout changes and reflow. They expire on history deletion/eviction from
+10,000-line history, alternate-screen transitions, pane replacement, or config
+edits. See docs/reference/configuration.md for all rules and key combinations;
+examples/key-playback.toml demonstrates automatic looping with native actions.
+
+## Experimental feature gates
+
+The line-numbers runtime gate defaults on, but gutters start hidden, including
+in nysos --demo. Prefix then # shows them for the focused pane.
+To disable it if it causes problems:
+  nysos --demo --disable-feature line-numbers
+or set top-level features = []. Omitting features uses the default enabled list;
+an explicit array replaces it. Repeatable --disable-feature overrides
+TOML and CLI enables at startup; full-demo editing can subsequently change gates.
+Unknown gate names are errors. No special Cargo build is required.
+
+With this gate enabled, top-level line_numbers (default false), optional pane
+line_numbers, and cue-action line_numbers control attached gutter visibility.
+Prefix then # toggles the focused pane live and updates its savable pane default.
+Numbers share terminal scrollback, including s/b, and never enter PTY input or
+output. Wrapped continuations show an arrow. The gutter reserves eight columns;
+small panes collapse it and alternate-screen applications leave it blank.
+See docs/guide/feature-gates.md for numbering resets, copy caveats, and limits.

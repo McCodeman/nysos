@@ -6,14 +6,29 @@
 # Command-line reference
 
 ```text
-Run named, interactive shell panes alongside a manually advanced command queue.
-Configure global and per-cue pane layouts, sizing, colors, shells, and commands in a
-TOML demo file.
+Run named, interactive shell panes alongside a manual or timed cue playlist.
+Configure global and per-cue pane layouts, sizing, colors, shells, commands, key
+presses, and looping in a TOML demo file.
 Loading a demo never automatically executes its queued commands.
 
 Usage: nysos [OPTIONS]
 
 Options:
+      --enable-feature <FEATURE>
+          Enable an experimental runtime feature (repeatable; also configurable in TOML)
+
+          Possible values:
+          - line-numbers: Attached, scroll-synchronized logical line-number gutters
+            (enabled by default)
+
+      --disable-feature <FEATURE>
+          Disable an experimental feature; takes precedence over TOML and
+          --enable-feature
+
+          Possible values:
+          - line-numbers: Attached, scroll-synchronized logical line-number gutters
+            (enabled by default)
+
       --demo
           Load the built-in six-cue demo with three panes in nested columns and rows
 
@@ -80,6 +95,7 @@ Options:
 EXAMPLES:
   nysos                              Start two shells with an empty cue list
   nysos --demo                       Load the built-in six-cue demo
+  nysos --demo --disable-feature line-numbers  Disable line gutters if needed
   nysos --add-to-path                 Add this binary directory to Bash/Zsh PATH
   nysos --install-completions         Install Bash and Zsh completions
   nysos --init demo.toml              Write a starter file without overwriting
@@ -93,11 +109,15 @@ INTERACTIVE CONTROLS:
     a          Add a live pane        Tab  Focus next pane
     < / >      Narrow / widen pane    - / +  Shorten / heighten pane
     0          Focus cue list         c  Show/hide cue list
+    #          Toggle pane line numbers (requires line-numbers feature gate)
     ?          Show all controls      q  Quit and close shell sessions
   In the cue list: Up/Down selects, Enter sends a cue, e edits it, o edits the full
   demo.
-  Press p in the cue list to preview each pane’s next command; Esc closes.
-  Press t to type those commands without Enter for editing in the shells.
+  Press p in the cue list to preview each pane’s next command or key/clear action; Esc
+  closes.
+  Press t to type commands without Enter; key/clear actions are sent immediately.
+  In Cues: s restores execution bookmarks, b scrolls all panes to bottom.
+  Space pauses/resumes an armed cue timer; browsing cancels it.
   Cue commands are sent in order without waiting for completion.
   Alt-Left/Right rotates focus; Ghostty mappings also accept Alt-B/F. Click to focus;
   drag dividers to resize.

@@ -17,6 +17,7 @@ nav = [
     { "tmux and SSH" = "guide/tmux-ssh.md" },
     { "Layouts and resizing" = "guide/layouts.md" },
     { "Controls and mouse" = "guide/controls.md" },
+    { "Feature gates and line numbers" = "guide/feature-gates.md" },
     { "Editing and saving" = "guide/editor.md" },
     { "Troubleshooting" = "guide/troubleshooting.md" },
   ] },

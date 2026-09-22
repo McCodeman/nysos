@@ -208,3 +208,32 @@ Licensed under [Apache-2.0](LICENSE); see [NOTICE](NOTICE). Third-party dependen
 retain their own licenses. Earlier tagged versions retain their published licenses.
 Generate the Rust dependency [SPDX SBOM](sbom/nysos.spdx.json) with `make sbom`;
 CI also publishes a freshly generated SBOM artifact.
+
+### Key cues, timers, and output bookmarks
+
+Cue entries can use `keys = [{ key = "Ctrl+C", repeat = 2 }]` or `clear = true`
+instead of `command`. Preview (`p`) shows the action and repeat counts; `t` sends
+keys/clears immediately. Set a cue's `advance_after_ms` to execute the next cue
+after a delay, and top-level `loop = true` to wrap the playlist. Space in the cue
+list pauses/resumes an armed timer; browsing cancels it.
+
+Cue-list `s` restores the selected cue's execution positions; `b` returns all
+panes to live output. Bookmarks depend on retained terminal history. See the
+[complete configuration reference](docs/reference/configuration.md#key-actions-timers-and-native-clear)
+and [timed key-action example](examples/key-playback.toml).
+
+### Experimental line-number gutters
+
+```sh
+nysos --demo
+```
+
+Focus a shell and press **Ctrl-G, #** to show/hide its attached gutter during the
+session. The gutter shares terminal scrollback and reserves its own width outside
+the PTY. Logical lines are numbered; wrapped continuations show `↳`. The gate is
+on by default, but gutters start hidden, including in the built-in demo.
+Press **Ctrl-G, #** in a focused pane to show them. If the feature causes problems, use
+`nysos --demo --disable-feature line-numbers`, or set `features = []` in TOML. Global,
+pane, and cue `line_numbers` booleans control visibility. See
+[feature gates and line numbers](docs/guide/feature-gates.md) for all controls and
+experimental limitations, and [the example](examples/line-numbers.toml).

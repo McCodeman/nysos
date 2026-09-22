@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: Copyright 2026 Marshall Cody McCain (mccodeman@proton.me)
+# SPDX-License-Identifier: Apache-2.0
+
+title = "Keys, timers, and looping"
+loop = true
+layout = "columns"
+
+[[panes]]
+id = "worker"
+title = "Worker"
+shell = "/bin/sh"
+scheme = "ocean"
+
+[[panes]]
+id = "notes"
+title = "Playback notes"
+shell = "/bin/sh"
+scheme = "forest"
+
+[[queues]]
+name = "Start a long-running command"
+description = "Enter starts playback. Space pauses its timer; browsing cancels it."
+advance_after_ms = 3000
+commands = [
+  { pane = "worker", command = "printf 'Working (interrupt follows in 3 seconds)\\n'; sleep 60" },
+  { pane = "notes", command = "printf 'Select an executed cue and press s to revisit its output; b returns to bottom.\\n'" },
+]
+
+[[queues]]
+name = "Interrupt"
+description = "p previews Ctrl+C. Both t and Enter send it immediately."
+advance_after_ms = 1500
+commands = [{ pane = "worker", keys = [{ key = "Ctrl+C", repeat = 1 }], title = "Interrupted", scheme = "ember" }]
+
+[[queues]]
+name = "New output"
+advance_after_ms = 3000
+commands = [{ pane = "worker", command = "printf 'Ready for another pass\\n'", scheme = "forest" }]
+
+[[queues]]
+name = "Clear the emulator"
+description = "No shell clear command is sent. The timer loops to the first cue."
+advance_after_ms = 1500
+commands = [{ pane = "worker", clear = true, title = "Worker", scheme = "ocean" }]

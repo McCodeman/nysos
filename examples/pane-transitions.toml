@@ -5,6 +5,8 @@
 # Enter in the cue list executes the selected cue. Prefix, n steps one command.
 # Each command targets a stable pane ID and may change that pane's title/scheme.
 # Omitted panes keep their current appearance and shell state.
+features = ["line-numbers"]
+line_numbers = false
 title = "Independent pane titles and themes"
 header = true
 cue_list = true

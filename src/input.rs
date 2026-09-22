@@ -19,6 +19,85 @@ pub fn focus_direction(key: KeyEvent, ghostty: bool) -> Option<isize> {
     }
 }
 
+/// Parse portable terminal key names, independently of nysos focus bindings.
+pub fn parse_key(name: &str) -> anyhow::Result<KeyEvent> {
+    let name = name
+        .strip_prefix('<')
+        .and_then(|s| s.strip_suffix('>'))
+        .unwrap_or(name);
+    let mut rest = name;
+    let mut modifiers = KeyModifiers::NONE;
+    while let Some((prefix, tail)) = rest.split_once('+') {
+        let modifier = match prefix.to_ascii_lowercase().as_str() {
+            "ctrl" | "control" => KeyModifiers::CONTROL,
+            "alt" | "option" => KeyModifiers::ALT,
+            "shift" => KeyModifiers::SHIFT,
+            _ => break,
+        };
+        modifiers |= modifier;
+        rest = tail;
+    }
+    let code = match rest.to_ascii_lowercase().as_str() {
+        "esc" | "escape" => KeyCode::Esc,
+        "enter" | "return" => KeyCode::Enter,
+        "tab" => KeyCode::Tab,
+        "backtab" => KeyCode::BackTab,
+        "backspace" => KeyCode::Backspace,
+        "space" => KeyCode::Char(' '),
+        "up" => KeyCode::Up,
+        "down" => KeyCode::Down,
+        "left" => KeyCode::Left,
+        "right" => KeyCode::Right,
+        "home" => KeyCode::Home,
+        "end" => KeyCode::End,
+        "pageup" => KeyCode::PageUp,
+        "pagedown" => KeyCode::PageDown,
+        "insert" => KeyCode::Insert,
+        "delete" => KeyCode::Delete,
+        lower
+            if lower.starts_with('f')
+                && lower[1..]
+                    .parse::<u8>()
+                    .is_ok_and(|n| (1..=12).contains(&n)) =>
+        {
+            KeyCode::F(lower[1..].parse()?)
+        }
+        _ if rest.chars().count() == 1 && !rest.chars().next().unwrap().is_control() => {
+            KeyCode::Char(rest.chars().next().unwrap())
+        }
+        _ => anyhow::bail!("Unsupported terminal key: {name}"),
+    };
+    if let KeyCode::Char(c) = code
+        && modifiers.contains(KeyModifiers::CONTROL)
+        && !(c.is_ascii_alphabetic() || " @[]\\^_?".contains(c))
+    {
+        anyhow::bail!("Unsupported control character: {name}");
+    }
+    if modifiers.contains(KeyModifiers::SHIFT) {
+        match code {
+            KeyCode::Tab => {
+                return Ok(KeyEvent::new(
+                    KeyCode::BackTab,
+                    modifiers - KeyModifiers::SHIFT,
+                ));
+            }
+            KeyCode::Char(_) => anyhow::bail!(
+                "Use the literal uppercase character or symbol instead of Shift: {name}"
+            ),
+            _ => {}
+        }
+    }
+    if matches!(code, KeyCode::Esc | KeyCode::Tab | KeyCode::BackTab) && !modifiers.is_empty() {
+        anyhow::bail!("This key does not support modifiers: {name}");
+    }
+    if matches!(code, KeyCode::Enter | KeyCode::Backspace)
+        && modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::SHIFT)
+    {
+        anyhow::bail!("This terminal key supports only Alt: {name}");
+    }
+    Ok(KeyEvent::new(code, modifiers))
+}
+
 pub fn key_bytes(key: KeyEvent, mode: TermMode) -> Vec<u8> {
     let control = key.modifiers.contains(KeyModifiers::CONTROL);
     let alt = key.modifiers.contains(KeyModifiers::ALT);
@@ -41,6 +120,7 @@ pub fn key_bytes(key: KeyEvent, mode: TermMode) -> Vec<u8> {
         }
     };
     let mut bytes = match key.code {
+        KeyCode::Char('?') if control => vec![0x7f],
         KeyCode::Char(c) if control && c.is_ascii() => vec![(c.to_ascii_uppercase() as u8) & 0x1f],
         KeyCode::Char(c) => c.to_string().into_bytes(),
         KeyCode::Enter => vec![b'\r'],
@@ -138,6 +218,44 @@ pub fn mouse_bytes(event: MouseEvent, x: u16, y: u16, mode: TermMode) -> Option<
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn scripted_keys_use_terminal_modes_and_reject_unsupported_names() {
+        for (name, expected) in [
+            ("ctrl+C", b"\x03".as_slice()),
+            ("Ctrl+D", b"\x04"),
+            ("<esc>", b"\x1b"),
+            ("Ctrl+?", b"\x7f"),
+            ("Ctrl+Space", b"\0"),
+            ("Shift+Tab", b"\x1b[Z"),
+            ("é", "é".as_bytes()),
+            ("+", b"+"),
+        ] {
+            assert_eq!(
+                key_bytes(parse_key(name).unwrap(), TermMode::empty()),
+                expected
+            );
+        }
+        assert_eq!(
+            key_bytes(parse_key("Left").unwrap(), TermMode::APP_CURSOR),
+            b"\x1bOD"
+        );
+        assert_eq!(
+            key_bytes(parse_key("Alt+Left").unwrap(), TermMode::empty()),
+            b"\x1b[1;3D"
+        );
+        for invalid in [
+            "Cmd+C",
+            "Ctrl+Enter",
+            "Shift+a",
+            "F13",
+            "Ctrl+9",
+            "Ctrl+é",
+            "Ctrl+Esc",
+            "bogus",
+        ] {
+            assert!(parse_key(invalid).is_err(), "{invalid}");
+        }
+    }
     #[test]
     fn focus_accepts_arrow_and_ghostty_word_sequences_only() {
         for (code, direction) in [

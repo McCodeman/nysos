@@ -42,6 +42,7 @@ After **Ctrl-G**:
 | --- | --- |
 | `n` or Enter | Send the next command, then advance |
 | `s` | Skip the next command |
+| `#` | Toggle the focused shell’s line-number gutter; requires the `line-numbers` gate |
 | `e` | Edit the current queue item's name, description, targets, and commands |
 | `o` | Edit the entire demo: title, add/reorder cues, panes, and layout |
 | `a` | Add and focus an ad hoc shell |
@@ -82,9 +83,12 @@ press **Ctrl-G, 0**. While focused:
 | Up / Down | Select the previous / next cue without executing |
 | Home / End | Select the first / last cue |
 | Page Up / Page Down | Browse a page at a time |
-| Enter | Send all remaining commands in the selected cue |
-| `p` | Preview the selected cue’s next command over each shell pane; Esc closes |
+| Enter | Send all remaining actions in the selected cue |
+| `p` | Preview the selected cue’s command, keys/repeats, or clear action over each shell pane; Esc closes |
 | `t` | Type the next command per target pane without Enter, then focus the first target |
+| `s` | Restore the selected cue’s recorded execution positions in its target panes |
+| `b` | Return all panes to the live bottom |
+| Space | Pause/resume an armed automatic-advance timer |
 | `e` | Edit only the selected cue in the modal |
 | `o` | Open the entire demo to add cues, rename the demo, or load/save a file |
 | Tab / Shift-Tab | Cycle focus to a shell |
@@ -153,3 +157,21 @@ on Linux; URLs are passed as process arguments, never through a shell.
 
 
 See [editing and saving](editor.md) for shortcuts inside the modal.
+
+### Key actions and automatic playback
+
+For `keys` and `clear` actions, `t` sends the action immediately. If a cue contains
+only those actions, it advances just like Enter. Mixed cues type shell commands
+without Enter, send key/clear actions, and leave playback unchanged; later Enter
+repeats every action. Prefix-n sends one action and prefix-s skips one action.
+Cue-list `s` has a different meaning: restore output bookmarks.
+
+Optional `advance_after_ms` timers execute the next cue; `loop = true` wraps to
+the first cue. Space pauses/resumes an armed timer in the cue list. Preview,
+help, and editor dialogs suspend it. Browsing/selecting a cue, restoring bookmarks,
+or applying edits cancels playback. See the
+[complete rules](../reference/configuration.md#key-actions-timers-and-native-clear).
+
+The experimental [line-number gutter](feature-gates.md) is toggled during a
+session with **prefix, #**. Click it to focus its pane; wheel over it to scroll
+history. Gutter clicks and numbers never reach the child application.

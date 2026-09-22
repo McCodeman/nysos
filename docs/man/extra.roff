@@ -17,7 +17,7 @@ Create a starter file without overwriting an existing file.
 Validate configuration without spawning shells or executing commands.
 .TP
 .B nysos \-\-config demo.toml
-Start a saved demonstration. Commands run only when manually advanced.
+Start a saved demonstration. Playback begins manually; optional cue timers can advance it afterward.
 .TP
 .B nysos \-\-add-to-path \-\-install-completions
 Configure PATH and completions for both Bash and Zsh, then exit.
@@ -136,7 +136,8 @@ pwd; ls runs ls regardless of the first command's exit status in sh, Bash, and Z
 The header displays the total number of command entries, such as "3 commands".
 Each queue has an
 optional description. Each command requires pane (an existing pane ID) and
-command (nonempty single-line input, with no NUL, CR, or LF).
+exactly one of command (nonempty single-line input, with no NUL, CR, or LF),
+keys (key tables), or clear = true.
 Optional command title and scheme change the target pane when sent or typed,
 without changing its ID or restarting its shell. Overrides persist until changed;
 preview and skip do not apply them. Titles must be nonempty without control characters.
@@ -254,3 +255,61 @@ standard Alt-Left/Right. Use an explicit profile when tmux or SSH masks the clie
 terminal identity, or when terminal keybindings differ from their defaults.
 Detection uses the launch environment; reconnecting tmux does not re-detect it.
 The resolved profile appears in the help title.
+
+.SH KEY ACTIONS AND AUTOMATIC PLAYBACK
+Each commands entry must contain exactly one of command, keys, or clear = true.
+For example: keys = [{ key = "Ctrl+C", repeat = 2 }]. Key tables require key;
+repeat defaults to 1, with at most 4096 presses total per pane entry.
+Names include Esc, Enter, Tab, BackTab, Backspace, Space, arrow/navigation keys,
+Insert, Delete, F1-F12, and literal Unicode characters. Ctrl/Alt/Shift modifiers
+are supported where terminal encoding exists; Command/Super is not supported.
+The configuration reference lists every valid combination.
+.PP
+Preview labels keys and repeat counts separately from shell commands.
+The t key sends key/clear actions immediately. Key/clear-only cues advance just
+like Enter; mixed cues type commands without Enter, send other actions, and leave
+progress unchanged. Enter afterward repeats every action.
+Native clear sends no PTY input, preserves cursor position and normal history,
+and does not stop the running process or erase its input buffer.
+.PP
+Each cue accepts advance_after_ms, an integer from 1 through 86400000.
+After dispatch, its timer executes the next cue without waiting for completion.
+Top-level loop = true wraps the playlist (default false). Startup never begins
+playback automatically. A cue without a timer stops the automatic chain.
+Space in Cues pauses/resumes an armed timer. Modals suspend the countdown;
+browsing cues, restoring bookmarks, or applying configuration cancels it.
+.SH OUTPUT BOOKMARKS
+In Cues, s restores that cue's latest execution-line bookmarks in its target
+panes; b returns all panes to live bottom. These are not undo or replay controls.
+Bookmarks survive resizing, layout changes, gutter toggles, and text reflow.
+They are in-memory and expire on history deletion or eviction from
+its 10000-line history, alternate-screen changes, pane replacement, or config edits.
+Unavailable bookmarks are reported without changing those panes' scroll positions.
+
+.SH FEATURE GATES AND LINE NUMBERS
+The line-numbers runtime gate defaults on, including in the built-in demo,
+and requires no special build. If it causes problems, use
+--disable-feature line-numbers or top-level features = []. Omitting features
+uses the default list; an explicit array replaces it. --enable-feature can
+re-enable a gate. --disable-feature wins over TOML and CLI enables.
+Both options are repeatable; unknown names are rejected. Startup overrides are
+saved in the editable demo; later full-demo edits can change the gate list.
+.PP
+Top-level line_numbers defaults false: gutters start hidden, including in the
+built-in demo. The enabled gate makes them available to turn on during a session.
+Visibility settings have no effect without the gate.
+Optional pane and cue-action line_numbers booleans override visibility.
+In a focused shell, prefix then # toggles its gutter without restarting it;
+save the full demo to persist that pane default. Cue overrides can change it again.
+.PP
+The attached eight-column gutter shares terminal scrollback and is excluded from
+PTY width, input, and output. Wrapped logical lines show a continuation marker.
+Gutter clicks focus; wheel events scroll history. Cursor and application mouse
+coordinates exclude the gutter. Host-terminal selection may still copy it.
+Narrow panes collapse the gutter; alternate-screen applications leave it blank
+with its width reserved. Visibility changes resize the PTY; bookmarks and retained line numbers follow reflow.
+.PP
+Numbering reflects the current buffer, not a permanent transcript. History clear,
+shell restart, gate re-enable, or unsupported buffer rearrangement restarts numbering. Layout changes preserve
+retained line numbers, including full-history and alternate-screen reflow. Values above 999999 display ++++++.
+See docs/guide/feature-gates.md for full behavior and experimental limitations.

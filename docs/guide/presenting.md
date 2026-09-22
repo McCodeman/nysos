@@ -21,7 +21,7 @@ external services are ready. Run the demo once to rehearse those details.
 
 A demo is an ordered list of queue items. Each item contains one or more commands,
 and each command names its target pane. The header shows the item index, name,
-description, and total command count (for example, “3 commands”). Toggle it with **prefix, h**.
+description, and total command count (for example, “3 commands”). Cues with key or clear entries show an action count instead. Toggle it with **prefix, h**.
 
 Press **Ctrl-G**, release it, then:
 
@@ -31,9 +31,9 @@ Press **Ctrl-G**, release it, then:
 
 An advance sends one command, not the entire queue item. After its last command,
 the next queue item becomes current. After the final item, the header says the
-demo is complete; all panes remain interactive. There is no timing engine or
-command-completion detection. Loading or applying a demo never runs queued
-commands automatically.
+demo is complete; all panes remain interactive. There is no command-completion detection. Optional cue timers execute the next
+cue after a configured delay, and `loop = true` wraps the playlist. Loading or
+applying a demo never starts playback automatically.
 
 Wait for the target shell's prompt before advancing. The command goes to its
 current foreground program or unfinished input buffer. If an editor, REPL, or
@@ -91,3 +91,26 @@ To replay from the beginning, open **prefix, o** and apply the demo again. This
 resets queue progress but retains sessions whose ID, shell, arguments, and
 working directory match. Shell state is therefore not reset by replay; restart
 panes or relaunch nysos if you need a fresh environment.
+
+## Keys, automatic playback, and revisiting output
+
+A cue entry can send a command, a sequence of keys with repeat counts, or a native
+pane clear. Preview with **p** to see which action will occur. **t** sends keys and
+clears immediately; for command text it still omits Enter. With only keys/clears,
+`t` advances just like Enter. Mixed cues leave playback unchanged after `t`, so
+later Enter repeats their key/clear actions too.
+
+Try `nysos --config examples/key-playback.toml` from a source checkout. Press Enter
+on its first cue: a timer interrupts the long-running command, then prints new
+output, clears the pane, and loops. Press **Space** in the cue list to pause or
+resume the countdown. Preview/help/editor dialogs suspend it; browsing another
+cue cancels it. Delays measure time since dispatch, not process completion.
+
+Select a previously executed cue and press **s** to scroll its target panes to
+where their actions began. Press **b** to return all panes to live output. A
+replay replaces that cue's previous bookmarks. Bookmarks can expire when terminal
+history is discarded or evicts their lines beyond its 10,000-line limit; they are not
+persistent recordings. The status line reports missing bookmarks.
+
+The [configuration reference](../reference/configuration.md#key-actions-timers-and-native-clear)
+contains every key name, repeat limit, timer rule, and bookmark limitation.

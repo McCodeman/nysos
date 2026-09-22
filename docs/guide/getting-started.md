@@ -166,3 +166,38 @@ use a relative or absolute path rather than `~`. Saving rewrites TOML formatting
 and drops comments. For all settings, see the
 [configuration reference](../reference/configuration.md). **Ctrl-G, ?** opens
 in-app help; `nysos --help` and `man nysos` describe command-line usage.
+
+## Revisit output and try timed key actions
+
+After executing a cue, select it again and press **s** to revisit its starting
+output in the target panes. Press **b** to return every pane to live output.
+Bookmarks survive layout changes, resizing, and reflow while their output remains
+in terminal history. Replacing panes or discarding their history invalidates them.
+
+The built-in demo remains manually driven. A source checkout also includes:
+
+```sh
+nysos --config examples/key-playback.toml
+```
+
+Run its first cue with Enter to begin a timed loop. It starts a process, sends
+Ctrl+C, prints new output, and clears the pane without a shell `clear` command.
+**p** shows key names and repeat counts for key cues; **t** sends their keys
+immediately, just like Enter. **Space** in the cue list pauses/resumes the timer;
+browsing another cue cancels it. Preview and editor dialogs suspend the countdown.
+See [presenting](presenting.md#keys-automatic-playback-and-revisiting-output) for
+mixed command/key cues and the full playback rules.
+
+## Try experimental line numbers
+
+With a build that lists `line-numbers` in `nysos --help`, launch:
+
+```sh
+nysos --demo
+```
+
+Focus a shell and press **Ctrl-G, #** to hide or show its gutter live. Scroll its
+output, or use cue-list `s` and `b`; the gutter follows the same position. The
+gate defaults on, but gutters start hidden: the first toggle shows them.
+Use `--disable-feature line-numbers` if the feature causes problems. See [feature gates](feature-gates.md) for TOML configuration
+and the numbering limitations.

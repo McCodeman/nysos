@@ -18,11 +18,17 @@ pub enum ShellTarget {
     version,
     long_version = include!(concat!(env!("OUT_DIR"), "/version.rs")),
     about = "Multi-pane scripted and interactive terminal demonstrations",
-    long_about = "Run named, interactive shell panes alongside a manually advanced command queue.\nConfigure global and per-cue pane layouts, sizing, colors, shells, and commands in a TOML demo file.\nLoading a demo never automatically executes its queued commands.",
+    long_about = "Run named, interactive shell panes alongside a manual or timed cue playlist.\nConfigure global and per-cue pane layouts, sizing, colors, shells, commands, key presses, and looping in a TOML demo file.\nLoading a demo never automatically executes its queued commands.",
     after_help = "Press Ctrl-G, then ? for interactive help. Use --help for examples and details.",
-    after_long_help = "EXAMPLES:\n  nysos                              Start two shells with an empty cue list\n  nysos --demo                       Load the built-in six-cue demo\n  nysos --add-to-path                 Add this binary directory to Bash/Zsh PATH\n  nysos --install-completions         Install Bash and Zsh completions\n  nysos --init demo.toml              Write a starter file without overwriting\n  nysos --config demo.toml --check     Validate without opening shells\n  nysos --config demo.toml             Present a saved demo\n\nINTERACTIVE CONTROLS:\n  Press Ctrl-G, release, then:\n    n / Enter  Send next command       s  Skip next command\n    e          Edit current queue     o  Edit full demo: title, cues, panes\n    a          Add a live pane        Tab  Focus next pane\n    < / >      Narrow / widen pane    - / +  Shorten / heighten pane\n    0          Focus cue list         c  Show/hide cue list\n    ?          Show all controls      q  Quit and close shell sessions\n  In the cue list: Up/Down selects, Enter sends a cue, e edits it, o edits the full demo.\n  Press p in the cue list to preview each pane’s next command; Esc closes.\n  Press t to type those commands without Enter for editing in the shells.\n  Cue commands are sent in order without waiting for completion.\n  Alt-Left/Right rotates focus; Ghostty mappings also accept Alt-B/F. Click to focus; drag dividers to resize.\n  Cmd-click opens URLs locally on macOS; Alt-click is the portable fallback.\n\nNOTES:\n  Default Ctrl-G avoids tmux Ctrl-B; --prefix selects another key.\n  Over SSH use ssh -t; URL openers run on the nysos host.\n  Interactive mode requires a terminal on both stdin and stdout.\n  Wait for the target shell prompt before sending the next command.\n  --check validates TOML and pane references, not shell availability or commands.\n  No demo file is auto-discovered. Paths are relative to the launch directory.\n  macOS is primary, Linux secondary; native Windows interaction is deferred.\n\nEXIT STATUS:\n  0  Success (including help/version)\n  1  Configuration, file, PTY, or runtime error\n  2  Invalid command-line arguments\n\nDOCUMENTATION:\n  See docs/ for user guides and the complete configuration reference.\n  Run 'man nysos' after installing the manpage with 'make man-install'."
+    after_long_help = "EXAMPLES:\n  nysos                              Start two shells with an empty cue list\n  nysos --demo                       Load the built-in six-cue demo\n  nysos --demo --disable-feature line-numbers  Disable line gutters if needed\n  nysos --add-to-path                 Add this binary directory to Bash/Zsh PATH\n  nysos --install-completions         Install Bash and Zsh completions\n  nysos --init demo.toml              Write a starter file without overwriting\n  nysos --config demo.toml --check     Validate without opening shells\n  nysos --config demo.toml             Present a saved demo\n\nINTERACTIVE CONTROLS:\n  Press Ctrl-G, release, then:\n    n / Enter  Send next command       s  Skip next command\n    e          Edit current queue     o  Edit full demo: title, cues, panes\n    a          Add a live pane        Tab  Focus next pane\n    < / >      Narrow / widen pane    - / +  Shorten / heighten pane\n    0          Focus cue list         c  Show/hide cue list\n    #          Toggle pane line numbers (requires line-numbers feature gate)\n    ?          Show all controls      q  Quit and close shell sessions\n  In the cue list: Up/Down selects, Enter sends a cue, e edits it, o edits the full demo.\n  Press p in the cue list to preview each pane’s next command or key/clear action; Esc closes.\n  Press t to type commands without Enter; key/clear actions are sent immediately.\n  In Cues: s restores execution bookmarks, b scrolls all panes to bottom.\n  Space pauses/resumes an armed cue timer; browsing cancels it.\n  Cue commands are sent in order without waiting for completion.\n  Alt-Left/Right rotates focus; Ghostty mappings also accept Alt-B/F. Click to focus; drag dividers to resize.\n  Cmd-click opens URLs locally on macOS; Alt-click is the portable fallback.\n\nNOTES:\n  Default Ctrl-G avoids tmux Ctrl-B; --prefix selects another key.\n  Over SSH use ssh -t; URL openers run on the nysos host.\n  Interactive mode requires a terminal on both stdin and stdout.\n  Wait for the target shell prompt before sending the next command.\n  --check validates TOML and pane references, not shell availability or commands.\n  No demo file is auto-discovered. Paths are relative to the launch directory.\n  macOS is primary, Linux secondary; native Windows interaction is deferred.\n\nEXIT STATUS:\n  0  Success (including help/version)\n  1  Configuration, file, PTY, or runtime error\n  2  Invalid command-line arguments\n\nDOCUMENTATION:\n  See docs/ for user guides and the complete configuration reference.\n  Run 'man nysos' after installing the manpage with 'make man-install'."
 )]
 pub struct Args {
+    /// Enable an experimental runtime feature (repeatable; also configurable in TOML)
+    #[arg(long, value_enum, value_name = "FEATURE", conflicts_with_all = ["init", "add_to_path", "install_completions"])]
+    pub enable_feature: Vec<crate::features::Feature>,
+    /// Disable an experimental feature; takes precedence over TOML and --enable-feature
+    #[arg(long, value_enum, value_name = "FEATURE", conflicts_with_all = ["init", "add_to_path", "install_completions"])]
+    pub disable_feature: Vec<crate::features::Feature>,
     /// Load the built-in six-cue demo with three panes in nested columns and rows
     #[arg(long, conflicts_with_all = ["config", "init", "add_to_path", "install_completions"])]
     pub demo: bool,
@@ -72,6 +78,23 @@ pub struct Args {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn feature_gate_options_validate_known_names_and_conflicts() {
+        let args =
+            Args::try_parse_from(["nysos", "--demo", "--enable-feature", "line-numbers"]).unwrap();
+        assert_eq!(args.enable_feature, [crate::features::Feature::LineNumbers]);
+        assert!(Args::try_parse_from(["nysos", "--enable-feature", "unknown"]).is_err());
+        assert!(
+            Args::try_parse_from([
+                "nysos",
+                "--init",
+                "demo.toml",
+                "--enable-feature",
+                "line-numbers"
+            ])
+            .is_err()
+        );
+    }
     #[test]
     fn demo_is_opt_in_and_conflicts_with_other_sources() {
         assert!(!Args::try_parse_from(["nysos"]).unwrap().demo);

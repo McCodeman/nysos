@@ -1,13 +1,20 @@
 // SPDX-FileCopyrightText: Copyright 2026 Marshall Cody McCain (mccodeman@proton.me)
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::config::{PaneConfig, Scheme};
+use crate::config::{Command, PaneConfig, Scheme};
 use alacritty_terminal::{
     Term,
     event::{Event, EventListener},
-    grid::{Dimensions, Scroll},
-    term::{Config, TermMode, cell::Flags},
-    vte::ansi::{self, NamedColor},
+    grid::{Dimensions, Grid, Scroll},
+    index::{Column, Line},
+    term::{
+        Config, TermMode,
+        cell::{Cell, Flags, Hyperlink, LineLength},
+    },
+    vte::{
+        self,
+        ansi::{self, NamedColor},
+    },
 };
 use anyhow::{Context, Result, bail};
 use portable_pty::{Child, CommandBuilder, MasterPty, PtySize, native_pty_system};
@@ -17,10 +24,14 @@ use ratatui::{
     style::{Color, Modifier, Style},
 };
 use std::{
+    collections::HashMap,
     io::{Read, Write},
     sync::mpsc::{self, Receiver, Sender},
     thread,
 };
+
+const HISTORY_LIMIT: usize = 10_000;
+const GUTTER_WIDTH: u16 = 8;
 
 pub struct Listener(Sender<Event>);
 impl EventListener for Listener {
@@ -45,10 +56,140 @@ impl Dimensions for Size {
     }
 }
 
+struct Bookmark {
+    line: i32,
+    row: usize,
+}
+
+struct ResizeMarker {
+    number: u64,
+    logical_start: bool,
+    cues: Vec<usize>,
+}
+
+/// Reflow an annotated copy with Alacritty's own algorithm. Hyperlink metadata
+/// carries anchors without changing characters, wrap flags, or line lengths.
+/// No marker is ever installed in the live terminal or sent to a PTY.
+struct ResizeTracker {
+    grid: Grid<Cell>,
+    markers: HashMap<String, ResizeMarker>,
+}
+impl ResizeTracker {
+    fn new(pane: &Pane) -> Self {
+        let mut grid = pane.term.grid().clone();
+        let mut markers = HashMap::new();
+        let mut number = pane.first_number;
+        let mut continuation = pane.first_continuation;
+        for row in -(grid.history_size() as i32)..grid.screen_lines() as i32 {
+            let line = Line(row);
+            // Existing links are irrelevant to the copy and cannot masquerade
+            // as anchors. Arc-backed extras use copy-on-write.
+            for cell in &mut grid[line][..] {
+                cell.set_hyperlink(None);
+            }
+            let last = grid[line].line_length().0.saturating_sub(1);
+            for column in [0, last] {
+                if column == 0 && markers.contains_key(&format!("{row}:0")) {
+                    continue;
+                }
+                let id = format!("{row}:{column}");
+                let cues = if column == 0 {
+                    pane.bookmarks
+                        .iter()
+                        .filter(|(_, bookmark)| bookmark.line == row)
+                        .map(|(&cue, _)| cue)
+                        .collect()
+                } else {
+                    vec![]
+                };
+                markers.insert(
+                    id.clone(),
+                    ResizeMarker {
+                        number,
+                        logical_start: column == 0 && !continuation,
+                        cues,
+                    },
+                );
+                grid[line][Column(column)]
+                    .set_hyperlink(Some(Hyperlink::new(Some(id), "nysos-resize-anchor".into())));
+            }
+            continuation = grid[line][Column(grid.columns() - 1)]
+                .flags
+                .contains(Flags::WRAPLINE);
+            if !continuation {
+                number = number.saturating_add(1);
+            }
+        }
+        Self { grid, markers }
+    }
+    fn resize(&mut self, size: Size) {
+        self.grid
+            .resize(true, size.rows as usize, size.cols as usize);
+    }
+    fn anchors(&self) -> (HashMap<usize, i32>, Option<(u64, bool)>) {
+        let mut cues = HashMap::new();
+        let mut numbering = None;
+        let mut logical_offset = 0;
+        let oldest = -(self.grid.history_size() as i32);
+        let starts_at_head = self.grid[Line(oldest)][Column(0)]
+            .hyperlink()
+            .and_then(|link| self.markers.get(link.id()))
+            .is_some_and(|marker| marker.logical_start);
+        for row in oldest..self.grid.screen_lines() as i32 {
+            for cell in &self.grid[Line(row)][..] {
+                let Some(link) = cell.hyperlink() else {
+                    continue;
+                };
+                let Some(marker) = self.markers.get(link.id()) else {
+                    continue;
+                };
+                numbering.get_or_insert((
+                    marker.number.saturating_sub(logical_offset).max(1),
+                    !starts_at_head,
+                ));
+                for &cue in &marker.cues {
+                    cues.insert(cue, row);
+                }
+            }
+            if !self.grid[Line(row)][Column(self.grid.columns() - 1)]
+                .flags
+                .contains(Flags::WRAPLINE)
+            {
+                logical_offset += 1;
+            }
+        }
+        (cues, numbering)
+    }
+}
+
+#[derive(Default)]
+struct ScreenSwitch(Option<bool>);
+impl vte::Perform for ScreenSwitch {
+    fn csi_dispatch(
+        &mut self,
+        params: &vte::Params,
+        intermediates: &[u8],
+        ignore: bool,
+        action: char,
+    ) {
+        if !ignore
+            && intermediates == b"?"
+            && matches!(action, 'h' | 'l')
+            && params
+                .iter()
+                .any(|param| matches!(param.first(), Some(47 | 1047 | 1049)))
+        {
+            self.0 = Some(action == 'h');
+        }
+    }
+}
+
 pub struct Pane {
     pub config: PaneConfig,
     pub term: Term<Listener>,
     parser: ansi::Processor,
+    screen_parser: vte::Parser,
+    inactive_numbering: Option<ResizeTracker>,
     master: Box<dyn MasterPty + Send>,
     writer: Box<dyn Write + Send>,
     child: Option<Box<dyn Child + Send + Sync>>,
@@ -56,6 +197,12 @@ pub struct Pane {
     events: Receiver<Event>,
     size: Size,
     pub exited: bool,
+    number_tracking: bool,
+    show_line_numbers: bool,
+    first_number: u64,
+    first_continuation: bool,
+    number_head: Vec<bool>,
+    bookmarks: std::collections::HashMap<usize, Bookmark>,
 }
 impl Pane {
     pub fn spawn(config: PaneConfig) -> Result<Self> {
@@ -108,8 +255,17 @@ impl Pane {
         let (tx, events) = mpsc::channel();
         Ok(Self {
             config,
-            term: Term::new(Config::default(), &size, Listener(tx)),
+            term: Term::new(
+                Config {
+                    scrolling_history: HISTORY_LIMIT,
+                    ..Config::default()
+                },
+                &size,
+                Listener(tx),
+            ),
             parser: ansi::Processor::new(),
+            screen_parser: vte::Parser::new(),
+            inactive_numbering: None,
             master: pair.master,
             writer,
             child: Some(child),
@@ -117,6 +273,12 @@ impl Pane {
             events,
             size,
             exited: false,
+            number_tracking: false,
+            show_line_numbers: false,
+            first_number: 1,
+            first_continuation: false,
+            number_head: vec![],
+            bookmarks: Default::default(),
         })
     }
     pub fn pump(&mut self) -> Result<()> {
@@ -125,7 +287,7 @@ impl Pane {
             let Ok(bytes) = self.output.try_recv() else {
                 break;
             };
-            self.parser.advance(&mut self.term, &bytes);
+            self.process_output(&bytes);
         }
         while let Ok(event) = self.events.try_recv() {
             let reply = match event {
@@ -160,6 +322,194 @@ impl Pane {
             .is_some();
         Ok(())
     }
+    fn process_output(&mut self, bytes: &[u8]) {
+        if self.bookmarks.is_empty() && !self.number_tracking {
+            self.screen_parser
+                .advance(&mut ScreenSwitch::default(), bytes);
+            self.parser.advance(&mut self.term, bytes);
+            return;
+        }
+        // Observe each terminal operation separately, including history deletion
+        // followed by fresh output in the same PTY read.
+        for &byte in bytes {
+            self.prepare_number_head();
+            let before = self.history_state();
+            let mut switch = ScreenSwitch::default();
+            self.screen_parser.advance(&mut switch, &[byte]);
+            let primary = (switch.0 == Some(true) && !before.2 && self.number_tracking)
+                .then(|| ResizeTracker::new(self));
+            self.parser.advance(&mut self.term, &[byte]);
+            self.track_history(before);
+            let alternate = self.term.mode().contains(TermMode::ALT_SCREEN);
+            if !before.2 && alternate {
+                self.inactive_numbering = primary;
+            }
+            if before.2 && !alternate {
+                if switch.0 == Some(false) {
+                    if let Some(tracker) = self.inactive_numbering.take()
+                        && let Some((number, continuation)) = tracker.anchors().1
+                    {
+                        self.first_number = number;
+                        self.first_continuation = continuation;
+                    }
+                } else {
+                    self.inactive_numbering = None;
+                    self.reset_numbers(); // A terminal reset also discards primary history.
+                }
+            }
+        }
+    }
+    fn history_state(&self) -> (usize, usize, bool) {
+        (
+            self.term.grid().history_size(),
+            self.row_identity(0),
+            self.term.mode().contains(TermMode::ALT_SCREEN),
+        )
+    }
+    fn row_identity(&self, line: i32) -> usize {
+        // Rows own separate cell allocations. Rotation moves rows without moving
+        // those allocations; resizing invalidates bookmarks separately. This
+        // address is compared only and never dereferenced.
+        &self.term.grid()[Line(line)][Column(0)] as *const _ as usize
+    }
+    fn track_history(&mut self, (history, top, alternate): (usize, usize, bool)) {
+        let retained = self.term.grid().history_size();
+        if alternate && self.term.mode().contains(TermMode::ALT_SCREEN) {
+            self.bookmarks.clear();
+            return;
+        }
+        if retained < history || alternate != self.term.mode().contains(TermMode::ALT_SCREEN) {
+            self.bookmarks.clear();
+            self.number_head.clear();
+            if !alternate && !self.term.mode().contains(TermMode::ALT_SCREEN) {
+                self.reset_numbers();
+            }
+            return;
+        }
+        let delta = if top == self.row_identity(0) {
+            0
+        } else {
+            // Even when history is full, the former top row moves into history.
+            // One terminal scroll operation moves at most one screenful of rows.
+            let limit = retained.min(self.term.grid().screen_lines());
+            let Some(delta) = (1..=limit).find(|&n| self.row_identity(-(n as i32)) == top) else {
+                self.bookmarks.clear(); // Reset or unsupported buffer rearrangement.
+                self.reset_numbers();
+                return;
+            };
+            delta as i32
+        };
+        let evicted = (history + delta as usize).saturating_sub(retained);
+        if self.number_tracking && !alternate && evicted > 0 {
+            for &wrap in self.number_head.iter().take(evicted) {
+                if !wrap {
+                    self.first_number = self.first_number.saturating_add(1);
+                }
+                self.first_continuation = wrap;
+            }
+            self.number_head.clear();
+        }
+        let grid = self.term.grid();
+        self.bookmarks.retain(|_, bookmark| {
+            let shifted = bookmark.line - delta;
+            if shifted < -(retained as i32) {
+                return false;
+            }
+            let identity = |line: i32| &grid[Line(line)][Column(0)] as *const _ as usize;
+            if identity(shifted) == bookmark.row {
+                bookmark.line = shifted;
+                true
+            } else {
+                // A fixed row below a scrolling region may not have moved.
+                // Other rearrangements expire the anchor instead of guessing.
+                identity(bookmark.line) == bookmark.row
+            }
+        });
+    }
+    fn reset_numbers(&mut self) {
+        self.first_number = 1;
+        self.first_continuation = false;
+        self.number_head.clear();
+    }
+    fn prepare_number_head(&mut self) {
+        let grid = self.term.grid();
+        if self.number_tracking
+            && !self.term.mode().contains(TermMode::ALT_SCREEN)
+            && self.number_head.is_empty()
+            && grid.history_size() + grid.screen_lines() >= HISTORY_LIMIT
+        {
+            self.number_head = (0..grid.history_size().min(grid.screen_lines()))
+                .map(|n| {
+                    grid[Line(-(grid.history_size() as i32) + n as i32)][Column(grid.columns() - 1)]
+                        .flags
+                        .contains(Flags::WRAPLINE)
+                })
+                .collect();
+        }
+    }
+    pub fn configure_line_numbers(&mut self, gate: bool, global: bool) {
+        if gate != self.number_tracking {
+            self.reset_numbers();
+            self.inactive_numbering = None;
+        }
+        self.number_tracking = gate;
+        self.show_line_numbers = gate && self.config.line_numbers.unwrap_or(global);
+    }
+    /// Geometry shared by PTY sizing, rendering, cursor placement, and hit testing.
+    pub fn body_area(&self, inner: Rect) -> Rect {
+        let gutter = if self.show_line_numbers && inner.width >= GUTTER_WIDTH + 8 {
+            GUTTER_WIDTH
+        } else {
+            0
+        };
+        Rect::new(
+            inner.x + gutter,
+            inner.y,
+            inner.width - gutter,
+            inner.height,
+        )
+    }
+    fn render_gutter(&self, inner: Rect, body: Rect, buf: &mut Buffer) {
+        if body.x == inner.x {
+            return;
+        }
+        let (fg, bg, _) = palette(self.config.scheme);
+        for y in inner.y..inner.bottom() {
+            buf.set_string(inner.x, y, "        ", Style::default().fg(fg).bg(bg));
+        }
+        // Keep the reserved width stable when an application owns the screen.
+        if self.term.mode().contains(TermMode::ALT_SCREEN) {
+            return;
+        }
+        let grid = self.term.grid();
+        let top = -(grid.display_offset() as i32);
+        let bottom = (top + inner.height as i32).min(grid.screen_lines() as i32);
+        let mut number = self.first_number;
+        let mut continuation = self.first_continuation;
+        for line in -(grid.history_size() as i32)..bottom {
+            if line >= top {
+                let label = if continuation {
+                    "     ↳".into()
+                } else if number > 999_999 {
+                    "++++++".into()
+                } else {
+                    format!("{number:>6}")
+                };
+                buf.set_string(
+                    inner.x,
+                    inner.y + (line - top) as u16,
+                    format!("{label} │"),
+                    Style::default().fg(fg).bg(bg),
+                );
+            }
+            continuation = grid[Line(line)][Column(grid.columns() - 1)]
+                .flags
+                .contains(Flags::WRAPLINE);
+            if !continuation {
+                number = number.saturating_add(1);
+            }
+        }
+    }
     pub fn resize(&mut self, area: Rect) -> Result<()> {
         let size = Size {
             cols: area.width.max(2),
@@ -172,7 +522,36 @@ impl Pane {
                 pixel_width: 0,
                 pixel_height: 0,
             })?;
+            let normal = !self.term.mode().contains(TermMode::ALT_SCREEN);
+            let mut tracker = (normal && (self.number_tracking || !self.bookmarks.is_empty()))
+                .then(|| ResizeTracker::new(self));
+            if let Some(tracker) = &mut tracker {
+                tracker.resize(size);
+            }
+            if let Some(primary) = &mut self.inactive_numbering {
+                primary.resize(size);
+            }
             self.term.resize(size);
+            self.number_head.clear();
+            if let Some(tracker) = tracker {
+                let (positions, numbering) = tracker.anchors();
+                self.bookmarks = positions
+                    .into_iter()
+                    .map(|(cue, line)| {
+                        (
+                            cue,
+                            Bookmark {
+                                line,
+                                row: self.row_identity(line),
+                            },
+                        )
+                    })
+                    .collect();
+                if let Some((number, continuation)) = numbering {
+                    self.first_number = number;
+                    self.first_continuation = continuation;
+                }
+            }
             self.size = size;
         }
         Ok(())
@@ -189,6 +568,58 @@ impl Pane {
         self.writer.flush()?;
         Ok(())
     }
+    pub fn bookmark(&mut self, cue: usize) {
+        self.bookmarks.remove(&cue);
+        if !self.term.mode().contains(TermMode::ALT_SCREEN) {
+            let line = self.term.grid().cursor.point.line.0;
+            self.bookmarks.insert(
+                cue,
+                Bookmark {
+                    line,
+                    row: self.row_identity(line),
+                },
+            );
+        }
+    }
+    pub fn forget_bookmarks(&mut self) {
+        self.bookmarks.clear();
+    }
+    pub fn restore_bookmark(&mut self, cue: usize) -> bool {
+        let Some(bookmark) = self.bookmarks.get(&cue) else {
+            return false;
+        };
+        let offset = (-bookmark.line).max(0);
+        self.term.scroll_display(Scroll::Bottom);
+        self.term.scroll_display(Scroll::Delta(offset));
+        true
+    }
+    pub fn send_action(&mut self, action: &Command, type_only: bool) -> Result<()> {
+        if action.clear {
+            // Clear the emulator, preserving history and the application's cursor.
+            // Do not inject shell input or interrupt a foreground application.
+            use ansi::Handler;
+            self.prepare_number_head();
+            let before = self.history_state();
+            self.term.clear_screen(ansi::ClearMode::All);
+            self.track_history(before);
+            self.term.scroll_display(Scroll::Bottom);
+            Ok(())
+        } else if !action.keys.is_empty() {
+            let mut bytes = Vec::new();
+            for key in &action.keys {
+                let encoded =
+                    crate::input::key_bytes(crate::input::parse_key(&key.key)?, *self.term.mode());
+                for _ in 0..key.repeat {
+                    bytes.extend_from_slice(&encoded);
+                }
+            }
+            self.write(&bytes)
+        } else if type_only {
+            self.paste(&action.command)
+        } else {
+            self.write(format!("{}\r", action.command).as_bytes())
+        }
+    }
     pub fn paste(&mut self, text: &str) -> Result<()> {
         // Strip escape characters to avoid terminating bracketed paste early.
         let text = text.replace('\x1b', "");
@@ -199,6 +630,9 @@ impl Pane {
         }
     }
     pub fn render(&self, area: Rect, buf: &mut Buffer) {
+        let body = self.body_area(area);
+        self.render_gutter(area, body, buf);
+        let area = body;
         let content = self.term.renderable_content();
         let (fg, bg, _) = palette(self.config.scheme);
         buf.set_style(area, Style::default().fg(fg).bg(bg));
@@ -247,6 +681,7 @@ impl Pane {
         }
     }
     pub fn cursor(&self, area: Rect) -> Option<(u16, u16)> {
+        let area = self.body_area(area);
         let content = self.term.renderable_content();
         let point = content.cursor.point;
         if content.display_offset != 0
@@ -390,6 +825,231 @@ fn convert_color(color: ansi::Color, scheme: Scheme) -> Color {
 mod tests {
     use super::*;
     #[cfg(unix)]
+    fn numbered_pane() -> Pane {
+        Pane::spawn(PaneConfig {
+            shell: crate::config::test_shell(),
+            args: crate::config::test_shell_args(),
+            ..Default::default()
+        })
+        .unwrap()
+    }
+    fn gutter_rows(pane: &Pane, area: Rect) -> Vec<String> {
+        let mut buffer = Buffer::empty(area);
+        pane.render(area, &mut buffer);
+        (area.y..area.bottom())
+            .map(|y| {
+                (area.x..area.x + GUTTER_WIDTH)
+                    .map(|x| buffer[(x, y)].symbol())
+                    .collect::<String>()
+            })
+            .collect()
+    }
+    #[test]
+    fn gated_gutter_wraps_reflows_and_shares_cursor_and_scrollback() {
+        let mut pane = numbered_pane();
+        let area = Rect::new(3, 4, 24, 4);
+        pane.configure_line_numbers(false, true);
+        assert_eq!(pane.body_area(area), area);
+        pane.configure_line_numbers(true, true);
+        assert_eq!(pane.body_area(area), Rect::new(11, 4, 16, 4));
+        pane.resize(pane.body_area(area)).unwrap();
+        pane.process_output(b"12345678901234567\r\nnext");
+        assert_eq!(
+            &gutter_rows(&pane, area)[..3],
+            ["     1 │", "     ↳ │", "     2 │"]
+        );
+        assert_eq!(pane.cursor(area), Some((15, 6)));
+        let wide = Rect::new(3, 4, 32, 4);
+        pane.resize(pane.body_area(wide)).unwrap();
+        assert_eq!(&gutter_rows(&pane, wide)[..2], ["     1 │", "     2 │"]);
+        pane.bookmark(1);
+        pane.process_output(b"\r\nthree\r\nfour\r\nfive\r\nsix\r\n");
+        assert!(pane.restore_bookmark(1));
+        assert_eq!(gutter_rows(&pane, wide)[0], "     2 │");
+        pane.term.scroll_display(Scroll::Top);
+        assert_eq!(gutter_rows(&pane, wide)[0], "     1 │");
+        pane.term.scroll_display(Scroll::Bottom);
+        assert!(gutter_rows(&pane, wide)[0].contains('4'));
+        pane.process_output(b"\x1b[?1049hALT\r\n");
+        assert!(gutter_rows(&pane, wide).iter().all(|row| row == "        "));
+        pane.process_output(b"\x1b[?1049l");
+        pane.term.scroll_display(Scroll::Top);
+        assert_eq!(gutter_rows(&pane, wide)[0], "     1 │");
+        pane.config.line_numbers = Some(false);
+        pane.configure_line_numbers(true, true);
+        assert_eq!(pane.body_area(area), area);
+        pane.config.line_numbers = Some(true);
+        pane.configure_line_numbers(true, true);
+        let tiny = Rect::new(0, 0, 12, 3);
+        assert_eq!(pane.body_area(tiny), tiny);
+    }
+    #[test]
+    fn bookmarks_and_line_labels_survive_repeated_reflow_at_history_capacity() {
+        let mut pane = numbered_pane();
+        pane.configure_line_numbers(true, true);
+        let mut area = Rect::new(0, 0, 48, 8);
+        pane.resize(pane.body_area(area)).unwrap();
+        pane.process_output(&b"history line\r\n".repeat(HISTORY_LIMIT + 20));
+        pane.bookmark(42);
+        pane.process_output("\x1b]8;;https://example.com/anchor\x1b\\ANCHOR 界🙂 original output with a long wrapped command\x1b]8;;\x1b\\\r\n".as_bytes());
+        pane.process_output(&b"later output\r\n".repeat(40));
+        assert!(pane.restore_bookmark(42));
+        let label = gutter_rows(&pane, area)[0].clone();
+        assert_ne!(label, "     1 │");
+        for (width, height) in [(24, 6), (80, 12), (18, 4), (48, 8)] {
+            area = Rect::new(0, 0, width, height);
+            pane.resize(pane.body_area(area)).unwrap();
+            assert!(pane.restore_bookmark(42), "lost anchor at {width}x{height}");
+            assert_eq!(gutter_rows(&pane, area)[0], label);
+            assert_eq!(
+                pane.url_at(0, 0).as_deref(),
+                Some("https://example.com/anchor")
+            );
+            let mut buffer = Buffer::empty(area);
+            pane.render(area, &mut buffer);
+            assert_eq!(buffer[(8, 0)].symbol(), "A");
+        }
+        // Resizing an alternate application must also reflow the hidden primary
+        // numbering without replacing its original labels or hyperlink content.
+        pane.process_output(b"\x1b[?1049h");
+        area.width = 20;
+        pane.resize(pane.body_area(area)).unwrap();
+        pane.process_output(b"\x1b[?1049l");
+        // Bookmarks expire on alternate-screen transitions; numbering does not.
+        assert!(!pane.restore_bookmark(42));
+        let grid = pane.term.grid();
+        let anchor = (-(grid.history_size() as i32)..grid.screen_lines() as i32)
+            .find(|&line| grid[Line(line)][Column(0)].c == 'A')
+            .unwrap();
+        pane.term.scroll_display(Scroll::Bottom);
+        pane.term.scroll_display(Scroll::Delta(-anchor));
+        assert_eq!(gutter_rows(&pane, area)[0], label);
+    }
+    #[test]
+    fn gutter_numbers_survive_history_eviction_and_native_clear() {
+        let mut pane = numbered_pane();
+        pane.configure_line_numbers(true, true);
+        let area = Rect::new(0, 0, 28, 4);
+        pane.resize(pane.body_area(area)).unwrap();
+        pane.process_output(&b"line\r\n".repeat(HISTORY_LIMIT + 12));
+        assert_eq!(pane.first_number, 10);
+        pane.term.scroll_display(Scroll::Top);
+        assert_eq!(gutter_rows(&pane, area)[0], "    10 │");
+        pane.send_action(
+            &Command {
+                clear: true,
+                ..Default::default()
+            },
+            false,
+        )
+        .unwrap();
+        assert!(pane.first_number >= 10);
+        pane.process_output(b"\x1b[?1049h");
+        let first = pane.first_number;
+        pane.process_output(&b"alt\r\n".repeat(40));
+        pane.process_output(b"\x1b[?1049l");
+        assert_eq!(pane.first_number, first);
+        pane.process_output(b"\x1b[?1049h");
+        pane.resize(Rect::new(0, 0, 24, 4)).unwrap();
+        pane.process_output(b"\x1b[?1049l");
+        assert_eq!(pane.first_number, first);
+        pane.process_output(b"\x1b[3J");
+        assert_eq!(pane.first_number, 1);
+    }
+    #[test]
+    fn key_actions_repeat_native_clear_and_history_bookmarks() {
+        struct Capture(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);
+        impl Write for Capture {
+            fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+                self.0.lock().unwrap().extend_from_slice(bytes);
+                Ok(bytes.len())
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+        let mut pane = Pane::spawn(PaneConfig {
+            shell: crate::config::test_shell(),
+            args: crate::config::test_shell_args(),
+            ..Default::default()
+        })
+        .unwrap();
+        let bytes = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        pane.writer = Box::new(Capture(bytes.clone()));
+        let action = Command {
+            keys: vec![
+                crate::config::KeyPress {
+                    key: "Ctrl+C".into(),
+                    repeat: 2,
+                },
+                crate::config::KeyPress {
+                    key: "Ctrl+D".into(),
+                    repeat: 1,
+                },
+                crate::config::KeyPress {
+                    key: "<esc>".into(),
+                    repeat: 1,
+                },
+                crate::config::KeyPress {
+                    key: "Left".into(),
+                    repeat: 3,
+                },
+            ],
+            ..Default::default()
+        };
+        for type_only in [false, true] {
+            pane.send_action(&action, type_only).unwrap();
+        }
+        let expected = b"\x03\x03\x04\x1b\x1b[D\x1b[D\x1b[D".repeat(2);
+        assert_eq!(*bytes.lock().unwrap(), expected);
+        pane.resize(Rect::new(0, 0, 40, 4)).unwrap();
+        pane.process_output(b"prompt> ");
+        pane.bookmark(7);
+        pane.process_output(b"command\r\n1\r\n2\r\n3\r\n4\r\n5\r\n");
+        assert!(pane.restore_bookmark(7));
+        assert_eq!(
+            pane.term.grid().display_offset(),
+            pane.term.grid().history_size()
+        );
+        assert!(
+            pane.term
+                .renderable_content()
+                .display_iter
+                .any(|c| c.cell.c == 'p')
+        );
+        pane.send_action(
+            &Command {
+                clear: true,
+                ..Default::default()
+            },
+            false,
+        )
+        .unwrap();
+        assert_eq!(*bytes.lock().unwrap(), expected); // Native clear sent no PTY input.
+        assert!(
+            pane.term
+                .renderable_content()
+                .display_iter
+                .all(|c| c.cell.c == ' ')
+        );
+        assert!(pane.restore_bookmark(7));
+        pane.resize(Rect::new(0, 0, 20, 4)).unwrap();
+        assert!(pane.restore_bookmark(7));
+        pane.bookmark(8);
+        pane.process_output(b"\x1b[3J");
+        assert!(!pane.restore_bookmark(8));
+        pane.bookmark(9);
+        pane.process_output(&b"line\r\n".repeat(HISTORY_LIMIT + 8));
+        assert!(!pane.restore_bookmark(9)); // The bookmarked line was evicted.
+        assert_eq!(pane.term.grid().history_size(), HISTORY_LIMIT);
+        pane.bookmark(10);
+        pane.process_output(&b"more\r\n".repeat(12));
+        assert!(pane.restore_bookmark(10)); // New bookmarks still work at capacity.
+        assert!(pane.term.grid().display_offset() >= 9);
+        pane.bookmark(11);
+        pane.process_output(b"\x1b[2;4r\x1b[4;1H\n");
+        assert!(!pane.restore_bookmark(11)); // Partial-region rearrangement, not history.
+    }
     #[test]
     fn invalid_working_directory_is_not_silently_replaced() {
         let dir = tempfile::tempdir().unwrap();

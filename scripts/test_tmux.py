@@ -18,7 +18,7 @@ import time
 BINARY = Path('target/debug/nysos').resolve()
 
 
-def exercise(legacy=False):
+def exercise(legacy=False, gutter=False):
     with tempfile.TemporaryDirectory(prefix='nysos-tmux-') as directory:
         root = Path(directory)
         socket = str(root / 'socket')
@@ -34,12 +34,12 @@ name = "First cue"
 commands = [{{pane = "shell", command = "true"}}]
 [[queues]]
 name = "Second cue"
-commands = [{{pane = "shell", command = "touch {done}"}}]
+commands = [{{pane = "shell", command = "printf BOOKMARK_ANCHOR; touch {done}"}}]
 ''')
         master, slave = pty.openpty()
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 30, 100, 0, 0))
         os.set_blocking(master, False)
-        command = shlex.join([str(BINARY), '--config', str(config), '--terminal-keys', 'ghostty'] + (['--prefix', 'ctrl-b'] if legacy else []))
+        command = shlex.join([str(BINARY), '--config', str(config), '--terminal-keys', 'ghostty'] + (['--prefix', 'ctrl-b'] if legacy else []) + ([] if gutter else ['--disable-feature', 'line-numbers']))
         env = dict(os.environ, TERM='xterm-256color', SSH_TTY='/dev/test-ssh', SSH_CONNECTION='test test test test')
         env.pop('TMUX', None)
         client = subprocess.Popen(['tmux', '-S', socket, '-f', '/dev/null', 'new-session', '-s', 'test', command],
@@ -78,6 +78,19 @@ commands = [{{pane = "shell", command = "touch {done}"}}]
             tmux('set-option', '-g', 'mouse', 'on')
             # The visible cue list must receive keyboard input from launch.
             wait_for(lambda: 'CUES:' in screen())
+            if gutter:
+                before, after = root / 'width-before', root / 'width-after'
+                send(prefix + b'1')
+                send(f'stty size > {before}\r'.encode())
+                wait_for(lambda: before.exists() and len(before.read_text().split()) == 2)
+                send(prefix + b'#')
+                wait_for(lambda: 'Line numbers shown' in screen())
+                send(f'stty size > {after}\r'.encode())
+                wait_for(lambda: after.exists() and len(after.read_text().split()) == 2)
+                assert int(before.read_text().split()[1]) - int(after.read_text().split()[1]) == 8
+                send(prefix + b'#')
+                wait_for(lambda: 'Line numbers hidden' in screen())
+                send(prefix + b'0')
             # Exercise terminal bytes through tmux, not just synthetic KeyEvents.
             for right, left in [(b'\x1b[1;3C', b'\x1b[1;3D'), (b'\x1bf', b'\x1bb')]:
                 send(right)
@@ -130,9 +143,28 @@ commands = [{{pane = "shell", command = "touch {done}"}}]
             # SGR click selects the first cue through tmux mouse forwarding.
             send(b'\x1b[<0;3;6M\x1b[<0;3;6m')
             wait_for(lambda: '1/2' in screen().splitlines()[1])
+            # Additional live input must move the bookmark into scrollback.
+            flushed = root / 'scroll-output-ready'
+            send(prefix + b'1')
+            send(f"i=0; while [ $i -lt 60 ]; do printf 'manual-%s\\n' \"$i\"; i=$((i+1)); done; touch {flushed}\r".encode())
+            wait_for(lambda: flushed.exists() and 'manual-59' in screen())
+            assert 'BOOKMARK_ANCHOR' not in screen()
+            if gutter:
+                send(prefix + b'#')
+                wait_for(lambda: 'Line numbers shown' in screen())
+            send(prefix + b'0' + b'\x1b[B' + b's')
+            wait_for(lambda: 'Restored 1/1' in screen() and 'BOOKMARK_ANCHOR' in screen())
+            label = screen().splitlines()[5][27:33] if gutter else None
             fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack('HHHH', 24, 90, 0, 0))
             client.send_signal(signal.SIGWINCH)
             wait_for(lambda: tmux('display-message', '-p', '-t', 'test:0.0', '#{pane_width}x#{pane_height}').strip() == '90x23')
+            wait_for(lambda: screen().splitlines()[20][89] == '┘')
+            send(b'b')
+            wait_for(lambda: 'BOOKMARK_ANCHOR' not in screen())
+            send(b's')
+            wait_for(lambda: 'BOOKMARK_ANCHOR' in screen())
+            if gutter:
+                assert screen().splitlines()[5][27:33] == label
             send(prefix + b'q')
             wait_for(lambda: client.poll() is not None)
             assert client.returncode == 0
@@ -146,4 +178,7 @@ commands = [{{pane = "shell", command = "touch {done}"}}]
 
 for legacy in (False, True):
     exercise(legacy)
-    print('PASS: tmux client, SSH environment, full-editor Ctrl/F-key load/save/apply, cues, Alt/Option focus, mouse, resize, quit; prefix=' + ('ctrl-b' if legacy else 'ctrl-g'))
+    print('PASS: tmux client, SSH environment, full-editor Ctrl/F-key load/save/apply, cues, Alt/Option focus, mouse, resize, cue bookmarks after manual output, quit; prefix=' + ('ctrl-b' if legacy else 'ctrl-g'))
+
+exercise(gutter=True)
+print('PASS: default-on gate starts with hidden gutters and toggles over tmux/SSH and resizes the child PTY by eight columns')

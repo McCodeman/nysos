@@ -16,7 +16,7 @@ import termios
 import time
 import tomllib
 
-BINARY = Path('target/debug/nysos').resolve()
+BINARY = Path(os.environ.get('NYSOS_BINARY', 'target/debug/nysos')).resolve()
 
 
 def exercise(no_mouse):
@@ -79,10 +79,14 @@ def exercise(no_mouse):
             fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack('HHHH', rows, cols, 0, 0))
             client.send_signal(signal.SIGWINCH)
             wait_for(lambda: tmux('display-message', '-p', '-t', 'layout:0.0', '#{pane_width}x#{pane_height}').strip() == f'{cols}x{rows - 1}')
-            wait_for(lambda: len(screen().splitlines()) == rows - 1)
+            # tmux resizes its screen before the application's SIGWINCH has
+            # propagated to child PTYs. Wait for nysos to redraw its bottom-right
+            # pane corner at the new dimensions before querying a shell's size.
+            wait_for(lambda: screen().splitlines()[rows - 4][cols - 1] == '┘')
 
         try:
             wait_for(lambda: 'Presenter' in screen() and 'Notes' in screen())
+            wait_for(lambda: screen().splitlines()[36][145] == '┘')
             tmux('set-option', '-g', 'mouse', 'off' if no_mouse else 'on')
             before_layout = tomllib.loads(config.read_text())['layout']
             before = shell_size()

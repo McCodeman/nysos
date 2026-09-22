@@ -1653,6 +1653,31 @@ mod tests {
     #[test]
     fn typing_waits_for_enter_and_allows_editing_in_each_shell() {
         let mut app = app();
+        app.resize(Rect::new(0, 0, 160, 40)).unwrap();
+        // Wait for an actual prompt, not a startup delay or the terminal's echo
+        // of input queued before the shell has initialized its line editor.
+        for pane in &mut app.panes {
+            pane.write(b"PS1='NYSOS_READY> '\r").unwrap();
+        }
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            app.tick().unwrap();
+            if app.panes.iter().all(|pane| {
+                let grid = pane.term.grid();
+                let row = &grid[grid.cursor.point.line];
+                (0..grid.cursor.point.column.0)
+                    .map(|column| row[alacritty_terminal::index::Column(column)].c)
+                    .collect::<String>()
+                    == "NYSOS_READY> "
+            }) {
+                break;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "shell prompts did not become ready"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        }
         let dir = tempfile::tempdir().unwrap();
         let paths = [dir.path().join("first"), dir.path().join("second")];
         app.demo.queues[0].commands = ["presenter", "observer"]

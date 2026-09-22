@@ -198,3 +198,39 @@ build time. Setting `NYSOS_GIT_COMMIT` disables Git discovery; omitted metadata
 then remains `unknown`. No current timestamp is embedded, preserving reproducible
 builds. Regenerate CLI docs with `make docs-generate`; generated references omit
 machine-specific build metadata.
+
+## Releases
+
+[Release Please](https://github.com/googleapis/release-please) runs on pushes to
+`main` and can be started manually from Actions. Its Rust strategy maintains a
+release PR with `Cargo.toml`, the root package in `Cargo.lock`, `CHANGELOG.md`,
+and `.release-please-manifest.json`. The generated manpage has invisible version
+markers so its version stays synchronized without hand-editing generated output.
+
+Use Conventional Commits for commits merged into `main` (or squash PR titles):
+
+- `fix: ...` produces a patch release.
+- `feat: ...` produces a minor release.
+- `feat!: ...` or a `BREAKING CHANGE:` footer produces a minor release while
+  below 1.0.0, then a major release afterward.
+- `docs: ...`, `ci: ...`, and `chore: ...` alone do not trigger a release.
+
+The initial manifest records the existing 0.1.0 package. The bootstrap commit is
+`c74a829`; older commits used non-conventional messages and are excluded from
+initial automated release notes. This setup does not create a historical v0.1.0
+tag or publish a release immediately. The next qualifying commit opens a release
+PR; subsequent commits update it. Review its changelog and version, wait for CI,
+and merge it to publish the `vX.Y.Z` Git tag and GitHub release.
+
+The workflow uses the repository's built-in `GITHUB_TOKEN`, with write access
+scoped to this workflow. Repository Actions settings must allow Actions to create
+pull requests. Token-created PRs do not trigger ordinary PR workflows, so the
+release workflow explicitly dispatches **Build and docs** on the release branch.
+Review that run in Actions before merging; dispatch runs may not appear as normal
+PR-required checks. No personal access token is required. This setup does not
+publish to crates.io or attach prebuilt binaries.
+
+After a release, update the separate
+[Homebrew tap](https://github.com/McCodeman/homebrew-tap) to the new tag archive,
+checksum, and Git build metadata, following its maintenance instructions.
+Homebrew formula updates are currently manual.

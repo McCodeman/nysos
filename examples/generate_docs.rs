@@ -39,7 +39,10 @@ fn main() -> Result<()> {
         .title("NYSOS")
         .date("2026-09-21")
         .manual("User Commands");
+    // Invisible roff comments let Release Please update only version-bearing sections.
+    man.extend_from_slice(b".\\\" x-release-please-start-version\n");
     manual.render_title(&mut man)?;
+    man.extend_from_slice(b".\\\" x-release-please-end\n");
     manual.render_name_section(&mut man)?;
     // clap_mangen 0.2 omits option value placeholders in its synopsis.
     // Use the same compact synopsis as --help; OPTIONS documents each value.
@@ -47,7 +50,9 @@ fn main() -> Result<()> {
     manual.render_description_section(&mut man)?;
     manual.render_options_section(&mut man)?;
     man.extend_from_slice(include_bytes!("../docs/man/extra.roff"));
+    man.extend_from_slice(b".\\\" x-release-please-start-version\n");
     manual.render_version_section(&mut man)?;
+    man.extend_from_slice(b".\\\" x-release-please-end\n");
     // Roff fills ordinary text lines. Wrap source prose for readable diffs and
     // mandoc lint, leaving macros and their arguments untouched.
     let mut formatted = String::new();

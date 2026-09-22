@@ -138,3 +138,7 @@ See [development documentation](docs/development.md) for build targets, generate
 CLI/manpage updates, CI, and the code map. The annotated
 [example demo](examples/demo.toml) uses `/bin/zsh`; change that to an installed
 shell on Linux. The built-in `--demo` and exported `--init` sample use `/bin/sh`.
+
+Releases use [Release Please](docs/development.md#releases). Use Conventional
+Commits (`feat:`, `fix:`) so it can prepare version bumps and release notes;
+merging its release PR publishes the GitHub release.

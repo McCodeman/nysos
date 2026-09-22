@@ -86,7 +86,7 @@ commands = [
 | `terminal_keys` | String enum | `"auto"` | `"auto"` detects Ghostty using TERM_PROGRAM/TERM; `"ghostty"` adds Alt-B/F focus aliases; `"standard"` preserves those shell keys. `--terminal-keys` overrides at startup. |
 | `prefix` | String enum | `"ctrl-g"` | Control prefix: `"ctrl-g"`, `"ctrl-a"`, `"ctrl-b"`, or `"f12"`. `--prefix` overrides it at startup. |
 | `header` | Boolean | `true` | Show the demo title, cue index/name/description, and command index above the panes. When the cue list is focused, show its selection. |
-| `cue_list` | Boolean | `true` | Show the left cue sidebar; toggle with Ctrl-G, c. |
+| `cue_list` | Boolean | `true` | Initially show and focus the left cue sidebar. Set `false` to hide it and focus the first shell. Toggle with Ctrl-G, c. |
 | `cue_width` | Integer | `26` | Sidebar width including borders, 16–60 columns; capped at half the content width in small terminals. |
 | `layout` | String or layout table | `"columns"` | Preset `"columns"`, `"rows"`, `"grid"`, or a nested split tree (below). |
 | `panes` | Array of pane tables | Built-in `presenter` and `observer` panes | Between 1 and 16 pane definitions; their count determines pane count. |

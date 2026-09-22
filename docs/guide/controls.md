@@ -93,7 +93,9 @@ press **Ctrl-G, 0**. While focused:
 The mouse wheel browses the list; clicking selects without executing. The `▶`
 marker identifies playback progress independently of your selection. The header
 previews the selected cue while the list is focused. **Ctrl-G, c** toggles the
-list, giving its space back to shell panes when hidden. Set `cue_list` and
+list, giving its space back to shell panes when hidden. On launch, the visible
+cue list has focus. Set `cue_list = false` to start with it hidden and focus the
+first shell instead; the default is `true`. Set `cue_list` and
 `cue_width` in the configuration to customize it.
 
 Enter resumes a partially sent current cue; selecting an earlier cue replays it.

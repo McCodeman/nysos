@@ -71,7 +71,8 @@ second key. Use Control, not Command, on macOS. Ctrl-G avoids tmux's Ctrl-B pref
 
 ## Preview and execute your first cue
 
-1. Press **Ctrl-G, 0** to focus the cue list. **Up/Down** selects a cue.
+1. The cue list has focus when nysos starts. **Up/Down** selects a cue.
+   Use **Ctrl-G, 0** to return to the cue list after working in a shell.
 2. Select **Introduce all three shells** and press **p**. Each pane shows an
    overlay containing its next command. Nothing has executed.
 3. Press **Esc** to close the overlays and restore the shell panes.

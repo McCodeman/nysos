@@ -76,7 +76,7 @@ commands = [{{pane = "shell", command = "touch {done}"}}]
         try:
             wait_for(lambda: 'First cue' in screen())
             tmux('set-option', '-g', 'mouse', 'on')
-            send(prefix + b'0')
+            # The visible cue list must receive keyboard input from launch.
             wait_for(lambda: 'CUES:' in screen())
             # Exercise terminal bytes through tmux, not just synthetic KeyEvents.
             for right, left in [(b'\x1b[1;3C', b'\x1b[1;3D'), (b'\x1bf', b'\x1bb')]:

@@ -90,6 +90,8 @@ impl App {
             std::env::var("TERM").ok().as_deref(),
         );
         let terminal_label = demo.terminal_keys.resolve(detected_terminal).label();
+        let mut cues = CueList::default();
+        cues.focused = demo.cue_list;
         Ok(Self {
             demo,
             panes,
@@ -116,7 +118,7 @@ impl App {
             viewport: Rect::default(),
             drag: None,
             dividers: vec![],
-            cues: CueList::default(),
+            cues,
         })
     }
     pub fn tick(&mut self) -> Result<()> {
@@ -1416,9 +1418,7 @@ mod tests {
         app.demo.queues.push(second);
         app.resize(Rect::new(0, 0, 100, 30)).unwrap();
         assert_eq!(app.rects[0].x, 26);
-        key(&mut app, KeyCode::Char('g'), KeyModifiers::CONTROL);
-        key(&mut app, KeyCode::Char('0'), KeyModifiers::NONE);
-        assert!(app.cues.focused);
+        assert!(app.cues.focused); // Arrow keys work immediately after launch.
         key(&mut app, KeyCode::Down, KeyModifiers::NONE);
         assert_eq!(app.cues.selected, 1);
         assert_eq!((app.queue, app.command), (0, 0));
@@ -1551,6 +1551,7 @@ mod tests {
             pane.args = crate::config::test_shell_args();
         }
         let mut app = App::new(demo, "demo.toml".into()).unwrap();
+        key(&mut app, KeyCode::Tab, KeyModifiers::NONE); // Leave the initial cue focus.
         let area = Rect::new(0, 0, 146, 66);
         app.resize(area).unwrap();
         let original = app.rects.clone();

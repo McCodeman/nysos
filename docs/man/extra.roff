@@ -113,6 +113,8 @@ cue_width (16 to 60 columns, default 26, capped at half the available width),
 layout (columns, rows, grid, or a nested layout table), panes, and
 queues. Omitted panes use the two interactive defaults; omitted queues are empty.
 Use queues = [] for an interactive-only demo with custom panes.
+The cue list is visible and focused at startup by default. Set cue_list = false
+to start with it hidden and the first shell focused.
 .PP
 Each pane table has id (unique identity), optional title (display label), shell, args, optional cwd,
 scheme (ocean, ember, forest, mono), and weight (1 to 1000). There must be 1 to 16

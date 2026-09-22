@@ -636,12 +636,7 @@ impl App {
                 .expect("validated target");
             pane.write(format!("{}\r", command.command).as_bytes())?;
         }
-        self.status = format!(
-            "{} {} → {}",
-            if skip { "Skipped" } else { "Sent" },
-            command.pane,
-            command.command
-        );
+        self.status.clear();
         self.command += 1;
         if self.command == queue.commands.len() {
             self.queue += 1;

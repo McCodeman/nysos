@@ -4,15 +4,16 @@
 {
   description = "nysos terminal demo application and development toolchain";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-  # Nixpkgs 26.11 dropped Intel macOS; retain its maintained 26.05 toolchain.
-  inputs.nixpkgs-intel-mac.url = "github:NixOS/nixpkgs/nixpkgs-26.05-darwin";
+  inputs.nixpkgs-current.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+  # nix develop resolves its own Bash from the input named nixpkgs. Keep that
+  # input on 26.05, which still supports Intel macOS, including its shell.
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-26.05-darwin";
 
   outputs =
     {
       self,
       nixpkgs,
-      nixpkgs-intel-mac,
+      nixpkgs-current,
     }:
     let
       systems = [
@@ -21,10 +22,9 @@
         "aarch64-linux"
         "x86_64-linux"
       ];
-      forAllSystems = nixpkgs.lib.genAttrs systems;
+      forAllSystems = nixpkgs-current.lib.genAttrs systems;
       pkgsFor =
-        system:
-        import (if system == "x86_64-darwin" then nixpkgs-intel-mac else nixpkgs) { inherit system; };
+        system: import (if system == "x86_64-darwin" then nixpkgs else nixpkgs-current) { inherit system; };
       packageFor =
         pkgs:
         pkgs.rustPlatform.buildRustPackage {

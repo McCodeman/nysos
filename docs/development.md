@@ -380,3 +380,10 @@ sending another. Flooding macOS PTYs with dozens of unconsumed command lines can
 lose input under CI load, which previously made that test flaky. This does not
 add command-completion detection to the app. CI uses the standard Nix binary
 cache and does not require a FlakeHub account or its optional cache action.
+
+Intel macOS uses the locked Nixpkgs 26.05 toolchain and installer v3.12.2.
+The flake input named `nixpkgs` also supplies the Bash that `nix develop` uses
+to enter the environment; keeping it on 26.05 avoids falling back to macOS's
+old system Bash. Other platforms use the separately locked `nixpkgs-current`
+packages. The resize integration test waits for nysos's rendered pane corner
+after tmux resizes, so shell-size assertions wait for the application's redraw.

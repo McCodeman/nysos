@@ -37,6 +37,12 @@ jobs:
           ref: ${{ inputs.ref }}
           fetch-depth: 0
       - uses: DeterminateSystems/nix-installer-action@v21
+        if: matrix.platform != 'darwin-amd64'
+      # Last installer supporting Intel Macs; the flake pins their 26.05 packages.
+      - uses: DeterminateSystems/nix-installer-action@v21
+        if: matrix.platform == 'darwin-amd64'
+        with:
+          source-tag: v3.12.2
       - name: Build archives and native Linux packages
         env:
           PACKAGE_PLATFORM: ${{ matrix.platform }}

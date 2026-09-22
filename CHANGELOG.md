@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.4](https://github.com/McCodeman/nysos/compare/v0.1.3...v0.1.4) (2026-09-22)
+
+
+### Features
+
+* add cue actions, timed playback, and persistent output navigation ([373fa72](https://github.com/McCodeman/nysos/commit/373fa72e0d2492aa6743f3ab657a820fdcbeb39a))
+
+
+### Bug Fixes
+
+* **ci:** wait for complete tmux frames after resizing ([564f472](https://github.com/McCodeman/nysos/commit/564f4727538a19e1a86954c770a6d76497d794dc))
+
 ## [0.1.3](https://github.com/McCodeman/nysos/compare/v0.1.2...v0.1.3) (2026-09-22)
 
 

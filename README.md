@@ -21,6 +21,11 @@ The Alacritty application itself is optional.
 Use `nysos --version` or `--version-full` for the UTC build timestamp and Git/build information;
 `nysos -V` prints the compact version.
 
+Agents: read [AGENTS.txt](AGENTS.txt) for a compact guide to installing nysos,
+writing demo TOML, and operating the cue list. [AGENTS.md](AGENTS.md) provides
+the repository discovery entry point; [docs/llms.txt](docs/llms.txt) indexes
+the agent-readable documentation.
+
 ## Quick start
 
 Plain `nysos` opens two interactive shells with an empty cue list. Use

@@ -85,7 +85,7 @@ commands = [
 | `title` | String | `"nysos demo"` | Nonempty demo title displayed above cue details when the header is enabled; control characters are rejected. |
 | `terminal_keys` | String enum | `"auto"` | `"auto"` detects Ghostty using TERM_PROGRAM/TERM; `"ghostty"` adds Alt-B/F focus aliases; `"standard"` preserves those shell keys. `--terminal-keys` overrides at startup. |
 | `prefix` | String enum | `"ctrl-g"` | Control prefix: `"ctrl-g"`, `"ctrl-a"`, `"ctrl-b"`, or `"f12"`. `--prefix` overrides it at startup. |
-| `header` | Boolean | `true` | Show the demo title, cue index/name/description, and command index above the panes. When the cue list is focused, show its selection. |
+| `header` | Boolean | `true` | Show the demo title, cue index/name/description, and total command count above the panes. When the cue list is focused, show its selection. |
 | `cue_list` | Boolean | `true` | Initially show and focus the left cue sidebar. Set `false` to hide it and focus the first shell. Toggle with Ctrl-G, c. |
 | `cue_width` | Integer | `26` | Sidebar width including borders, 16–60 columns; capped at half the content width in small terminals. |
 | `layout` | String or layout table | `"columns"` | Preset `"columns"`, `"rows"`, `"grid"`, or a nested split tree (below). |
@@ -300,7 +300,24 @@ matching shell sessions. Restarting a pane retains its current appearance.
 
 There is no per-command delay, environment, timeout, working directory, or
 completion condition. Commands run in the target pane's existing shell state.
-Use shell separators for compound commands or invoke a script for multiline work.
+To trigger commands separately in the same pane, put them in additional cues.
+To run multiple shell commands in one pane from a single cue, combine them into
+one `command` entry using shell separators, or invoke a script. For example:
+
+```toml
+[[queues]]
+name = "Inspect workspace"
+commands = [
+  { pane = "presenter", command = "cd /tmp && pwd && ls" },
+  { pane = "observer", command = "date; uname -a" },
+]
+```
+
+In sh, Bash, and Zsh, `&&` runs the next command only if the previous one succeeds;
+`;` runs the next command regardless of its exit status. Choose syntax supported
+by the pane's configured shell. These compound entries still count as one command
+per pane in the cue header. Enter in the cue list dispatches both entries without
+waiting for either pane to finish.
 
 TOML escaping and shell escaping are separate. In a double-quoted TOML string,
 `\\n` becomes literal backslash-plus-`n` for `printf`; `\n` becomes a real newline

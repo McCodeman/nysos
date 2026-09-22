@@ -1,0 +1,29 @@
+# nysos
+
+> A local terminal application for scripted and interactive CLI demos in multiple live shell panes. Start with the agent quick start, then consult the TOML reference when authoring demos.
+
+<!-- SPDX-FileCopyrightText: Copyright 2026 Marshall Cody McCain (mccodeman@proton.me) -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
+Use a real terminal/PTY to run nysos. Use `nysos --config demo.toml --check` for
+noninteractive validation. This index describes current main-branch docs;
+check `nysos --version-full` and `nysos --help` for the installed version.
+
+## Quick start
+
+- [Agent guide](AGENTS.txt): Installation, keyboard controls, executable TOML example, and terminal behavior.
+- [Getting started](https://raw.githubusercontent.com/McCodeman/nysos/main/docs/guide/getting-started.md): Installation tabs and a guided demo walkthrough.
+
+## Reference
+
+- [Configuration](https://raw.githubusercontent.com/McCodeman/nysos/main/docs/reference/configuration.md): Every TOML field, default, and validation rule.
+- [CLI](https://raw.githubusercontent.com/McCodeman/nysos/main/docs/reference/cli.md): Generated command-line help.
+- [Layouts](https://raw.githubusercontent.com/McCodeman/nysos/main/docs/guide/layouts.md): Nested rows/columns, weights, cue overrides, and resize behavior.
+- [Controls](https://raw.githubusercontent.com/McCodeman/nysos/main/docs/guide/controls.md): Focus, cue execution, preview, and typing.
+- [Editor](https://raw.githubusercontent.com/McCodeman/nysos/main/docs/guide/editor.md): Load, edit, apply, and save complete demos.
+
+## Optional
+
+- [Installation](https://raw.githubusercontent.com/McCodeman/nysos/main/docs/guide/installation.md): Homebrew, Linux packages, source builds, and download installer.
+- [tmux and SSH](https://raw.githubusercontent.com/McCodeman/nysos/main/docs/guide/tmux-ssh.md): Remote terminal controls and limitations.
+- [Development](https://raw.githubusercontent.com/McCodeman/nysos/main/docs/development.md): Nix environment, checks, packaging, and release workflow.

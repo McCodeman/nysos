@@ -175,19 +175,14 @@ impl App {
             } else {
                 self.queue
             };
-            let command_index = if queue_index == self.queue {
-                self.command
-            } else {
-                0
-            };
             let text = if let Some(queue) = self.demo.queues.get(queue_index) {
                 format!(
-                    "{}/{} · {} · command {}/{}\n{}",
+                    "{}/{} · {} · {} command{}\n{}",
                     queue_index + 1,
                     self.demo.queues.len(),
                     queue.name,
-                    command_index + 1,
                     queue.commands.len(),
+                    if queue.commands.len() == 1 { "" } else { "s" },
                     queue.description
                 )
             } else {

@@ -282,7 +282,14 @@ the global layout. Save to persist these changes.
 .PP
 Each queue table requires a nonempty name and one or more commands, with at
 most one command per pane within that queue. Repeated targets are rejected.
-The same pane may be used in another queue. Each queue has an
+Use additional cues for separately triggered commands in the same pane. To run
+multiple shell commands in one pane from a single cue, combine them into one
+command entry with shell separators: cd /tmp && pwd runs pwd only if cd
+succeeds;
+pwd; ls runs ls regardless of the first command's exit status in sh, Bash, and
+Zsh.
+The header displays the total number of command entries, such as "3 commands".
+Each queue has an
 optional description. Each command requires pane (an existing pane ID) and
 command (nonempty single-line input, with no NUL, CR, or LF).
 Optional command title and scheme change the target pane when sent or typed,

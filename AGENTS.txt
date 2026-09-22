@@ -1,0 +1,136 @@
+# nysos: quick start for agents
+
+<!-- SPDX-FileCopyrightText: Copyright 2026 Marshall Cody McCain (mccodeman@proton.me) -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
+nysos presents scripted and interactive CLI demos in live terminal panes.
+It is a local Rust TUI, not a web API. Use a real interactive terminal/PTY for
+presentation; use --check to validate a configuration without opening the TUI.
+macOS and Linux are supported; native Windows support is deferred (use WSL).
+
+## Install and launch
+
+    brew install mccodeman/tap/nysos
+    nysos --demo
+
+From a source checkout with Nix installed:
+
+    nix develop --command make install
+    export PATH="${CARGO_HOME:-$HOME/.cargo}/bin:$PATH"
+    nysos --demo
+
+Plain nysos opens two shells with no prepared cues. Only --demo loads the built-in
+three-pane, six-cue example: Service left, Observer above Notes right. No project
+file is auto-discovered. Export, validate, and open an editable copy with:
+
+    nysos --init demo.toml
+    nysos --config demo.toml --check
+    nysos --config demo.toml
+
+--init refuses to overwrite an existing file. Inspect nysos --help or man nysos
+for all CLI options. nysos --version-full shows version/build/Git information.
+Use the installed binary's help to check which features that version supports.
+
+## Operate a demo
+
+The cue list is visible and focused at startup unless cue_list = false.
+In that list, Up/Down selects a cue, p previews its commands, Esc closes preview,
+Enter dispatches the selected cue, e edits that cue, and o edits the whole demo.
+t types commands without Enter and focuses the first target shell for editing.
+Type mode does not advance playback; confirm each target's line manually.
+
+The default prefix is Ctrl-G: press it, release it, then press the following key.
+It avoids macOS's reserved Ctrl-Space and tmux's default Ctrl-B prefix.
+
+- Ctrl-G, 0: show and focus the cue list; Ctrl-G, c: toggle its visibility.
+- Ctrl-G, 1..9: focus a shell; Ctrl-G, Tab: rotate focus; click also focuses.
+- Ctrl-G, a: add an ad hoc shell; Ctrl-G, q: quit and close the shells.
+- Ctrl-G, o: edit the whole demo, including its title, cues, panes, and layout.
+- In the editor: Ctrl-L loads, Ctrl-S saves, Ctrl-G applies, Esc cancels.
+  F2/F3/F4 are alternatives for load/save/apply.
+- Ctrl-G, n: dispatch one pending command; Ctrl-G, s: skip one command.
+- Ctrl-G, < or >: resize width; Ctrl-G, - or +: resize height.
+- Ctrl-G, ?: show help. In a focused shell, normal keys and Ctrl-C reach it.
+
+Enter in the cue list sends all remaining entries of the selected cue without
+waiting for completion. Entries targeting different panes can run concurrently.
+Selection advances to the next cue; Enter on the completed last cue replays it.
+Commands go to each pane's current foreground program, not a fresh shell.
+Wait for shell prompts before sending more input; no completion detection exists.
+
+## Write a project TOML
+
+Use stable pane ids for all references. Titles and themes may change per cue.
+Each cue allows at most one command entry per pane. Use additional cues for
+separately triggered steps in the same pane. For multiple shell commands in one
+cue, combine them into one entry, such as "cd /tmp && pwd" or "date; uname -a".
+In sh/Bash/Zsh, && proceeds only on success; ; proceeds regardless of exit status.
+Command strings must be nonempty single-line input, with no NUL, CR, or LF.
+
+    title = "Quick demo"
+    cue_list = true
+    header = true
+
+    [layout]
+    direction = "columns"
+    children = [
+      { pane = "service", weight = 2 },
+      { direction = "rows", children = [{ pane = "observer" }, { pane = "notes" }] },
+    ]
+
+    [[panes]]
+    id = "service"
+    title = "Service"
+    shell = "/bin/sh"
+    scheme = "ocean"
+
+    [[panes]]
+    id = "observer"
+    title = "Observer"
+    shell = "/bin/sh"
+    scheme = "forest"
+
+    [[panes]]
+    id = "notes"
+    title = "Notes"
+    shell = "/bin/sh"
+    scheme = "mono"
+
+    [[queues]]
+    name = "Inspect"
+    description = "Run one shell entry in each target pane."
+    commands = [
+      { pane = "service", command = "pwd; ls", title = "Workspace", scheme = "ember" },
+      { pane = "observer", command = "uname -a" },
+      { pane = "notes", command = "printf 'Ready\\n'" },
+    ]
+
+Supported schemes: ocean, forest, ember, mono. Layouts accept columns/rows/grid
+presets or recursive direction/children groups and pane leaves with weights.
+Every pane must appear exactly once in a layout tree. A cue can override layout
+with the same schema; it applies on execution or typing, persists afterward,
+and does not apply during preview. Omitted pane styling retains its live value.
+
+## Terminal compatibility
+
+Font/window size changes redistribute layout using the stored proportions.
+Drag shared borders when mouse reporting is supported; --no-mouse and the
+keyboard controls provide a fallback. Ghostty Option-Left/Right is detected;
+use --terminal-keys ghostty if tmux/SSH hides the host identity. Prefix navigation
+works when Option/Alt sequences are intercepted. URL opening over SSH happens
+on the remote host, not automatically in the local browser.
+
+## Read more
+
+These raw Markdown links work both from this checkout and from built docs.
+
+- Getting started: https://raw.githubusercontent.com/McCodeman/nysos/main/docs/guide/getting-started.md
+- All TOML fields/defaults: https://raw.githubusercontent.com/McCodeman/nysos/main/docs/reference/configuration.md
+- Layouts and resizing: https://raw.githubusercontent.com/McCodeman/nysos/main/docs/guide/layouts.md
+- Controls: https://raw.githubusercontent.com/McCodeman/nysos/main/docs/guide/controls.md
+- Full-demo editing: https://raw.githubusercontent.com/McCodeman/nysos/main/docs/guide/editor.md
+- Installation/packages: https://raw.githubusercontent.com/McCodeman/nysos/main/docs/guide/installation.md
+- tmux/SSH: https://raw.githubusercontent.com/McCodeman/nysos/main/docs/guide/tmux-ssh.md
+- Source development: https://raw.githubusercontent.com/McCodeman/nysos/main/docs/development.md
+
+In a checkout, read the corresponding docs/ paths for changes not yet published.

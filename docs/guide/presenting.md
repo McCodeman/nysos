@@ -21,7 +21,7 @@ external services are ready. Run the demo once to rehearse those details.
 
 A demo is an ordered list of queue items. Each item contains one or more commands,
 and each command names its target pane. The header shows the item index, name,
-description, and command index. Toggle it with **prefix, h**.
+description, and total command count (for example, “3 commands”). Toggle it with **prefix, h**.
 
 Press **Ctrl-G**, release it, then:
 
@@ -50,6 +50,12 @@ pane without Enter so you can edit it directly in the shell. Typing leaves
 playback progress unchanged; see [controls](controls.md#type-and-edit-in-the-shells). **Enter** dispatches its commands in order without waiting for completion, then
 selects the next cue. It resumes remaining commands for the current playback
 item; choosing an earlier item replays it. Browsing alone changes no progress.
+Each cue allows one command entry per pane. Use additional cues for separately
+triggered commands in the same pane. To run several shell commands in that pane
+from one cue, combine them in one entry: `cd /tmp && pwd` runs `pwd` only if
+`cd` succeeds; `pwd; ls` runs `ls` regardless of the first command's exit status.
+Use separators supported by the pane's shell.
+
 Use **Ctrl-G, c** to show/hide the list and **Esc** to return to your shell.
 
 ## Work interactively

@@ -1,21 +1,21 @@
 {
   "SPDXID": "SPDXRef-DOCUMENT",
   "creationInfo": {
-    "created": "2026-09-22T07:32:12Z",
+    "created": "2026-09-22T07:40:51Z",
     "creators": [
       "Tool: cargo-sbom-v0.10.0"
     ],
-    "comment": "Cargo source dependency inventory across platforms, normal and build dependencies. Excludes development-only crates, Nix, Python documentation tools, system libraries, and final binary analysis. Cargo.lock SHA256: ce56b9e097ea5b6878a945d4f411d8432598b9f85fddbf80d09281c70656fad3"
+    "comment": "Cargo source dependency inventory across platforms, normal and build dependencies. Excludes development-only crates, Nix, Python documentation tools, system libraries, and final binary analysis. Cargo.lock SHA256: 9f9bdd3bfdc05f41f623b569dd4458263c14573cdf47da934d47fc39578a2c58"
   },
   "dataLicense": "CC0-1.0",
-  "documentNamespace": "https://spdx.org/spdxdocs/nysos-535007b0-c8bd-4bbb-ad7b-a9af5a6cf6c8",
+  "documentNamespace": "https://spdx.org/spdxdocs/nysos-ea65f792-a634-43c7-90a4-29b79545f284",
   "files": [
     {
       "SPDXID": "SPDXRef-File-nysos",
       "checksums": [
         {
           "algorithm": "SHA1",
-          "checksumValue": "8e068239029fd8836a384b94eb99020e7a94ad5e"
+          "checksumValue": "f65e65e014cb9b21918d57cba0861e9a42254bb3"
         }
       ],
       "fileName": "./Cargo.lock",
@@ -1891,14 +1891,14 @@
       ]
     },
     {
-      "SPDXID": "SPDXRef-Package-nysos-0.1.0",
+      "SPDXID": "SPDXRef-Package-nysos-0.1.1",
       "description": "Multi-pane scripted and interactive terminal demonstrations",
       "downloadLocation": "NONE",
       "homepage": "https://github.com/McCodeman/nysos",
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "Apache-2.0",
       "name": "nysos",
-      "versionInfo": "0.1.0",
+      "versionInfo": "0.1.1",
       "filesAnalyzed": false,
       "copyrightText": "Copyright 2026 Marshall Cody McCain (mccodeman@proton.me)"
     },
@@ -4063,7 +4063,7 @@
     {
       "spdxElementId": "SPDXRef-DOCUMENT",
       "relationshipType": "DESCRIBES",
-      "relatedSpdxElement": "SPDXRef-Package-nysos-0.1.0"
+      "relatedSpdxElement": "SPDXRef-Package-nysos-0.1.1"
     },
     {
       "spdxElementId": "SPDXRef-Package-aho-corasick-1.1.5",
@@ -4776,62 +4776,62 @@
       "relatedSpdxElement": "SPDXRef-Package-libc-0.2.189"
     },
     {
-      "spdxElementId": "SPDXRef-Package-nysos-0.1.0",
+      "spdxElementId": "SPDXRef-Package-nysos-0.1.1",
       "relationshipType": "DEPENDS_ON",
       "relatedSpdxElement": "SPDXRef-Package-alacritty--terminal-0.26.0"
     },
     {
-      "spdxElementId": "SPDXRef-Package-nysos-0.1.0",
+      "spdxElementId": "SPDXRef-Package-nysos-0.1.1",
       "relationshipType": "DEPENDS_ON",
       "relatedSpdxElement": "SPDXRef-Package-anyhow-1.0.104"
     },
     {
-      "spdxElementId": "SPDXRef-Package-nysos-0.1.0",
+      "spdxElementId": "SPDXRef-Package-nysos-0.1.1",
       "relationshipType": "DEPENDS_ON",
       "relatedSpdxElement": "SPDXRef-Package-clap--complete-4.6.11"
     },
     {
-      "spdxElementId": "SPDXRef-Package-nysos-0.1.0",
+      "spdxElementId": "SPDXRef-Package-nysos-0.1.1",
       "relationshipType": "DEPENDS_ON",
       "relatedSpdxElement": "SPDXRef-Package-clap-4.6.7"
     },
     {
-      "spdxElementId": "SPDXRef-Package-nysos-0.1.0",
+      "spdxElementId": "SPDXRef-Package-nysos-0.1.1",
       "relationshipType": "DEPENDS_ON",
       "relatedSpdxElement": "SPDXRef-Package-crossterm-0.28.1"
     },
     {
-      "spdxElementId": "SPDXRef-Package-nysos-0.1.0",
+      "spdxElementId": "SPDXRef-Package-nysos-0.1.1",
       "relationshipType": "DEPENDS_ON",
       "relatedSpdxElement": "SPDXRef-Package-portable-pty-0.9.0"
     },
     {
-      "spdxElementId": "SPDXRef-Package-nysos-0.1.0",
+      "spdxElementId": "SPDXRef-Package-nysos-0.1.1",
       "relationshipType": "DEPENDS_ON",
       "relatedSpdxElement": "SPDXRef-Package-ratatui-0.29.0"
     },
     {
-      "spdxElementId": "SPDXRef-Package-nysos-0.1.0",
+      "spdxElementId": "SPDXRef-Package-nysos-0.1.1",
       "relationshipType": "DEPENDS_ON",
       "relatedSpdxElement": "SPDXRef-Package-serde-1.0.229"
     },
     {
-      "spdxElementId": "SPDXRef-Package-nysos-0.1.0",
+      "spdxElementId": "SPDXRef-Package-nysos-0.1.1",
       "relationshipType": "DEPENDS_ON",
       "relatedSpdxElement": "SPDXRef-Package-tempfile-3.27.0"
     },
     {
-      "spdxElementId": "SPDXRef-Package-nysos-0.1.0",
+      "spdxElementId": "SPDXRef-Package-nysos-0.1.1",
       "relationshipType": "DEPENDS_ON",
       "relatedSpdxElement": "SPDXRef-Package-toml-0.8.23"
     },
     {
-      "spdxElementId": "SPDXRef-Package-nysos-0.1.0",
+      "spdxElementId": "SPDXRef-Package-nysos-0.1.1",
       "relationshipType": "DEPENDS_ON",
       "relatedSpdxElement": "SPDXRef-Package-tui-textarea-0.7.0"
     },
     {
-      "spdxElementId": "SPDXRef-Package-nysos-0.1.0",
+      "spdxElementId": "SPDXRef-Package-nysos-0.1.1",
       "relationshipType": "DEPENDS_ON",
       "relatedSpdxElement": "SPDXRef-Package-url-2.5.8"
     },

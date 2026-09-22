@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.2](https://github.com/McCodeman/nysos/compare/v0.1.1...v0.1.2) (2026-09-22)
+
+
+### Features
+
+* add cue layouts and portable release packages ([8b2c7a4](https://github.com/McCodeman/nysos/commit/8b2c7a49b7dabd730caff9bcd0962728db67935d))
+
+
+### Bug Fixes
+
+* preserve pane rendering during repeated cue execution ([863ea7d](https://github.com/McCodeman/nysos/commit/863ea7d8af02b5ae641bac69c6e076f1482109be))
+
 ## [0.1.1](https://github.com/McCodeman/nysos/compare/v0.1.0...v0.1.1) (2026-09-22)
 
 

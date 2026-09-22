@@ -198,8 +198,17 @@ Nix builds receive the flake revision (including a dirty suffix when supplied by
 Nix). Since flake sources omit `.git`, tags are `unknown`. Other archive/release
 builders can set `NYSOS_GIT_COMMIT`, `NYSOS_GIT_TAG`, and `NYSOS_GIT_DESCRIBE` at
 build time. Setting `NYSOS_GIT_COMMIT` disables Git discovery; omitted metadata
-then remains `unknown`. No current timestamp is embedded, preserving reproducible
-builds. Regenerate CLI docs with `make docs-generate`; generated references omit
+then remains `unknown`.
+
+Full version output includes `Build time (UTC): YYYY-MM-DDTHH:MM:SSZ`. Ordinary
+Cargo builds embed the time the build script runs; unchanged cached binaries
+retain their original timestamp. Source, manifest, lockfile, and Git metadata
+changes rerun the build script. Reproducible builders can set `SOURCE_DATE_EPOCH`
+to nonnegative Unix seconds; that timestamp is explicitly marked in the output.
+Nix supplies this variable, so Nix builds show the reproducible source timestamp
+rather than the wall-clock compilation time. Invalid values fail the build.
+
+Regenerate CLI docs with `make docs-generate`; generated references omit
 machine-specific build metadata.
 
 ## Releases

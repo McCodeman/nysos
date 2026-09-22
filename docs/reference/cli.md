@@ -30,7 +30,8 @@ Options:
           [possible values: ctrl-a, ctrl-b, ctrl-g, f12]
 
       --version-full
-          Print full version, Git metadata, compiler, target, and build profile
+          Print full version, build date/time (UTC), Git metadata, compiler, target, and
+          build profile
 
   -c, --config <PATH>
           Load a demo TOML file. No file is loaded automatically, including demo.toml.

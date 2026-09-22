@@ -18,12 +18,15 @@ fn git(args: &[&str]) -> Option<String> {
 }
 
 fn main() {
-    println!("cargo:rerun-if-changed=build.rs");
+    for path in ["build.rs", "src", "examples", "Cargo.toml", "Cargo.lock"] {
+        println!("cargo:rerun-if-changed={path}");
+    }
     for name in [
         "NYSOS_GIT_COMMIT",
         "NYSOS_GIT_TAG",
         "NYSOS_GIT_DESCRIBE",
         "RUSTC",
+        "SOURCE_DATE_EPOCH",
     ] {
         println!("cargo:rerun-if-env-changed={name}");
     }
@@ -69,8 +72,33 @@ fn main() {
     )
     .unwrap_or_else(|| "unknown".into());
     let value = |name| env::var(name).unwrap_or_else(|_| "unknown".into());
+    let (built_at, timestamp_source) = match env::var("SOURCE_DATE_EPOCH") {
+        Ok(epoch) => {
+            let seconds = epoch
+                .parse::<i64>()
+                .ok()
+                .filter(|seconds| *seconds >= 0)
+                .expect("SOURCE_DATE_EPOCH must be nonnegative Unix seconds");
+            (
+                time::OffsetDateTime::from_unix_timestamp(seconds)
+                    .expect("SOURCE_DATE_EPOCH is outside the supported calendar range"),
+                " (SOURCE_DATE_EPOCH)",
+            )
+        }
+        Err(env::VarError::NotPresent) => (time::OffsetDateTime::now_utc(), ""),
+        Err(error) => panic!("Invalid SOURCE_DATE_EPOCH: {error}"),
+    };
+    let build_time = format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z{timestamp_source}",
+        built_at.year(),
+        built_at.month() as u8,
+        built_at.day(),
+        built_at.hour(),
+        built_at.minute(),
+        built_at.second()
+    );
     let report = format!(
-        "{}\nGit commit: {commit}\nGit tag: {tag}\nGit describe: {describe}\nCompiler: {rustc}\nTarget: {}\nProfile: {} (opt-level {})",
+        "{}\nBuild time (UTC): {build_time}\nGit commit: {commit}\nGit tag: {tag}\nGit describe: {describe}\nCompiler: {rustc}\nTarget: {}\nProfile: {} (opt-level {})",
         value("CARGO_PKG_VERSION"),
         value("TARGET"),
         value("PROFILE"),

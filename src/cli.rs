@@ -35,7 +35,7 @@ pub struct Args {
     /// Override the demo control prefix (default: ctrl-g; avoids default tmux prefix)
     #[arg(long, value_enum, value_name = "KEY", conflicts_with_all = ["init", "add_to_path", "install_completions"])]
     pub prefix: Option<crate::prefix::Prefix>,
-    /// Print full version, Git metadata, compiler, target, and build profile
+    /// Print full version, build date/time (UTC), Git metadata, compiler, target, and build profile
     #[arg(long, action = clap::ArgAction::Version)]
     pub version_full: Option<bool>,
     /// Load a demo TOML file
@@ -97,6 +97,7 @@ mod tests {
             assert_eq!(error.exit_code(), 0);
             let report = error.to_string();
             for label in [
+                "Build time (UTC):",
                 "Git commit:",
                 "Git tag:",
                 "Git describe:",

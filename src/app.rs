@@ -941,6 +941,66 @@ mod tests {
         app.event(Event::Key(KeyEvent::new(code, modifiers)));
     }
     #[test]
+    fn builtin_final_cue_replays_on_every_enter() {
+        let mut demo = Demo::builtin().unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let paths = [dir.path().join("service"), dir.path().join("observer")];
+        for pane in &mut demo.panes {
+            pane.shell = crate::config::test_shell();
+            pane.args = crate::config::test_shell_args();
+        }
+        for (command, path) in demo
+            .queues
+            .last_mut()
+            .unwrap()
+            .commands
+            .iter_mut()
+            .zip(&paths)
+        {
+            command
+                .command
+                .push_str(&format!("; printf x >> '{}'", path.display()));
+        }
+        let count = demo.queues.len();
+        let mut app = App::new(demo, "demo.toml".into()).unwrap();
+        app.cues.focused = true;
+        app.resize(Rect::new(0, 0, 100, 30)).unwrap();
+        let mut terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
+        for _ in 0..count + 32 {
+            key(&mut app, KeyCode::Enter, KeyModifiers::NONE);
+            app.tick().unwrap();
+            terminal.draw(|frame| app.draw(frame)).unwrap();
+        }
+        assert_eq!(
+            (app.queue, app.command, app.cues.selected),
+            (count, 0, count - 1)
+        );
+        assert!(app.cues.focused);
+        assert_eq!(app.pane_preview("service").1, 1);
+        assert_eq!(app.pane_preview("observer").1, 1);
+        for (pane, path) in app.panes.iter_mut().zip(&paths) {
+            pane.write(format!("printf done >> '{}'\r", path.display()).as_bytes())
+                .unwrap();
+        }
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            app.tick().unwrap();
+            let contents: Vec<_> = paths
+                .iter()
+                .map(|path| std::fs::read_to_string(path).unwrap_or_default())
+                .collect();
+            if contents.iter().all(|text| text.ends_with("done")) {
+                assert_eq!(contents, vec![format!("{}done", "x".repeat(33)); 2]);
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "shell commands did not finish"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+    }
+    #[test]
     fn cue_styles_apply_only_on_dispatch_and_preserve_identity() {
         use crate::config::Scheme;
         let mut app = app();

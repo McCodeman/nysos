@@ -18,7 +18,7 @@ ad hoc panes while presenting.
 macOS first, Linux second; native Windows interaction is deferred (use WSL).
 The Alacritty application itself is optional.
 
-Use `nysos --version` or `--version-full` for build and Git information;
+Use `nysos --version` or `--version-full` for the UTC build timestamp and Git/build information;
 `nysos -V` prints the compact version.
 
 ## Quick start

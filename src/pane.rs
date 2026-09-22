@@ -233,7 +233,11 @@ impl Pane {
                     style = style.add_modifier(modifier);
                 }
             }
-            let mut symbol = cell.c.to_string();
+            // Alacritty retains tabs in its grid for text selection. Their
+            // spacing is already represented by subsequent grid cells. Emitting
+            // a raw tab would move the host cursor using its own tab stops,
+            // corrupting Ratatui's cell positioning and incremental redraws.
+            let mut symbol = if cell.c.is_control() { ' ' } else { cell.c }.to_string();
             if let Some(extra) = cell.zerowidth() {
                 symbol.extend(extra);
             }
@@ -444,6 +448,76 @@ mod tests {
         );
         assert!(web_url("file:///etc/passwd").is_none());
         assert!(web_url("javascript:alert(1)").is_none());
+    }
+    #[cfg(unix)]
+    #[test]
+    fn tabbed_output_stays_inside_pane_when_scrolling() {
+        use ratatui::{Terminal, backend::CrosstermBackend};
+        let mut pane = Pane::spawn(PaneConfig {
+            shell: crate::config::test_shell(),
+            args: crate::config::test_shell_args(),
+            ..Default::default()
+        })
+        .unwrap();
+        let area = Rect::new(31, 5, 33, 6);
+        pane.resize(area).unwrap();
+        // Like columnar ls output in the demo, followed by repeated final cues.
+        pane.parser
+            .advance(&mut pane.term, b"first\tsecond\tthird\r\n");
+        let (tx, _) = mpsc::channel();
+        let mut outer = Term::new(
+            Config::default(),
+            &Size {
+                cols: 100,
+                rows: 30,
+            },
+            Listener(tx),
+        );
+        let mut parser: ansi::Processor = ansi::Processor::new();
+        #[derive(Clone, Default)]
+        struct Capture(std::rc::Rc<std::cell::RefCell<Vec<u8>>>);
+        impl Write for Capture {
+            fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+                self.0.borrow_mut().extend_from_slice(bytes);
+                Ok(bytes.len())
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+        let capture = Capture::default();
+        let mut terminal = Terminal::with_options(
+            CrosstermBackend::new(capture.clone()),
+            ratatui::TerminalOptions {
+                viewport: ratatui::Viewport::Fixed(Rect::new(0, 0, 100, 30)),
+            },
+        )
+        .unwrap();
+        for _ in 0..12 {
+            let expected_buffer = terminal
+                .draw(|frame| {
+                    frame.render_widget(
+                        ratatui::widgets::Block::bordered(),
+                        Rect::new(30, 4, 35, 8),
+                    );
+                    pane.render(area, frame.buffer_mut());
+                })
+                .unwrap()
+                .buffer
+                .clone();
+            let bytes = std::mem::take(&mut *capture.0.borrow_mut());
+
+            parser.advance(&mut outer, &bytes);
+            // Check the actual emitted ANSI stream, not just the intended buffer.
+            for cell in outer.renderable_content().display_iter {
+                let x = cell.point.column.0 as u16;
+                let y = cell.point.line.0 as u16;
+                let expected = expected_buffer[(x, y)].symbol().chars().next().unwrap();
+                assert_eq!(cell.cell.c, expected, "host cell at {x},{y}");
+            }
+            pane.parser
+                .advance(&mut pane.term, b"Finished demonstration\r\n");
+        }
     }
     #[test]
     fn ansi_parser_preserves_color_and_cursor() {

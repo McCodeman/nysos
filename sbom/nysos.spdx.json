@@ -1,21 +1,21 @@
 {
   "SPDXID": "SPDXRef-DOCUMENT",
   "creationInfo": {
-    "created": "2026-09-22T07:40:51Z",
+    "created": "2026-09-22T08:23:50Z",
     "creators": [
       "Tool: cargo-sbom-v0.10.0"
     ],
-    "comment": "Cargo source dependency inventory across platforms, normal and build dependencies. Excludes development-only crates, Nix, Python documentation tools, system libraries, and final binary analysis. Cargo.lock SHA256: 9f9bdd3bfdc05f41f623b569dd4458263c14573cdf47da934d47fc39578a2c58"
+    "comment": "Cargo source dependency inventory across platforms, normal and build dependencies. Excludes development-only crates, Nix, Python documentation tools, system libraries, and final binary analysis. Cargo.lock SHA256: 53140b3764e760d050c2d4fa9eb957c10f4d01d9b0bf0d9ed80d4f8bb1789844"
   },
   "dataLicense": "CC0-1.0",
-  "documentNamespace": "https://spdx.org/spdxdocs/nysos-ea65f792-a634-43c7-90a4-29b79545f284",
+  "documentNamespace": "https://spdx.org/spdxdocs/nysos-32a33014-7a84-4758-a61a-288c2b0caf4e",
   "files": [
     {
       "SPDXID": "SPDXRef-File-nysos",
       "checksums": [
         {
           "algorithm": "SHA1",
-          "checksumValue": "f65e65e014cb9b21918d57cba0861e9a42254bb3"
+          "checksumValue": "9de0fb97dca8c7da5935f45a4f49c74315f80bf9"
         }
       ],
       "fileName": "./Cargo.lock",
@@ -816,6 +816,22 @@
         {
           "algorithm": "SHA256",
           "checksumValue": "ed17f5901b6630b993ca003def43f2f8ef4014fc13b047b57aad617ff32bc2ec"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-deranged-0.5.8",
+      "name": "deranged",
+      "versionInfo": "0.5.8",
+      "downloadLocation": "https://crates.io/api/v1/crates/deranged/0.5.8/download",
+      "licenseDeclared": "MIT OR Apache-2.0",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "copyrightText": "NOASSERTION",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "7cd812cc2bc1d69d4764bd80df88b4317eaef9e773c75226407d9bc0876b211c"
         }
       ]
     },
@@ -1891,6 +1907,22 @@
       ]
     },
     {
+      "SPDXID": "SPDXRef-Package-num-conv-0.2.2",
+      "name": "num-conv",
+      "versionInfo": "0.2.2",
+      "downloadLocation": "https://crates.io/api/v1/crates/num-conv/0.2.2/download",
+      "licenseDeclared": "MIT OR Apache-2.0",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "copyrightText": "NOASSERTION",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "521739c6d2bac4aa25192232afe6841231376b2b26d4d9fae5ecf8ca5772e441"
+        }
+      ]
+    },
+    {
       "SPDXID": "SPDXRef-Package-nysos-0.1.1",
       "description": "Multi-pane scripted and interactive terminal demonstrations",
       "downloadLocation": "NONE",
@@ -2164,6 +2196,22 @@
         {
           "algorithm": "SHA256",
           "checksumValue": "d83eb9bc6d8e5cf568e7a1101d60ee05e81ed50ea106026f3d18deeb046d7661"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-powerfmt-0.2.0",
+      "name": "powerfmt",
+      "versionInfo": "0.2.0",
+      "downloadLocation": "https://crates.io/api/v1/crates/powerfmt/0.2.0/download",
+      "licenseDeclared": "MIT OR Apache-2.0",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "copyrightText": "NOASSERTION",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
         }
       ]
     },
@@ -3064,6 +3112,38 @@
         {
           "algorithm": "SHA256",
           "checksumValue": "4fee6c4efc90059e10f81e6d42c60a18f76588c3d74cb83a0b242a2b6c7504c1"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-time-0.3.55",
+      "name": "time",
+      "versionInfo": "0.3.55",
+      "downloadLocation": "https://crates.io/api/v1/crates/time/0.3.55/download",
+      "licenseDeclared": "MIT OR Apache-2.0",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "copyrightText": "NOASSERTION",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "cdb87b95ec50ddfa440816d227a17b2ccbdda963a316a727fda0fc4334f7d134"
+        }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-time-core-0.1.9",
+      "name": "time-core",
+      "versionInfo": "0.1.9",
+      "downloadLocation": "https://crates.io/api/v1/crates/time-core/0.1.9/download",
+      "licenseDeclared": "MIT OR Apache-2.0",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "copyrightText": "NOASSERTION",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "9e1c906769ad99c88eaa54e728060edef082f8e358ff32030cb7c7d315e81109"
         }
       ]
     },
@@ -4823,6 +4903,11 @@
     {
       "spdxElementId": "SPDXRef-Package-nysos-0.1.1",
       "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-time-0.3.55"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-nysos-0.1.1",
+      "relationshipType": "DEPENDS_ON",
       "relatedSpdxElement": "SPDXRef-Package-toml-0.8.23"
     },
     {
@@ -5379,6 +5464,31 @@
       "spdxElementId": "SPDXRef-Package-thiserror-impl-1.0.69",
       "relationshipType": "DEPENDS_ON",
       "relatedSpdxElement": "SPDXRef-Package-syn-2.0.119"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-time-0.3.55",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-deranged-0.5.8"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-time-0.3.55",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-num-conv-0.2.2"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-time-0.3.55",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-powerfmt-0.2.0"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-time-0.3.55",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-serde--core-1.0.229"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-time-0.3.55",
+      "relationshipType": "DEPENDS_ON",
+      "relatedSpdxElement": "SPDXRef-Package-time-core-0.1.9"
     },
     {
       "spdxElementId": "SPDXRef-Package-tinystr-0.8.4",

@@ -144,8 +144,27 @@ fn plan(
             bail!("PATH directories cannot contain ':'");
         }
         let quoted = quote(dir)?;
+        // An existing entry can sit behind Homebrew after other startup files
+        // modify PATH. Move it to the front, removing only its duplicates.
         let body = format!(
-            "case \":${{PATH-}}:\" in\n  *:{quoted}:*) ;;\n  *) export PATH={quoted}${{PATH:+:\"$PATH\"}} ;;\nesac"
+            r#"_nysos_prepend_path() {{
+  local nysos_dir={quoted}
+  local nysos_rest="${{PATH-}}" nysos_part nysos_path
+  nysos_path="$nysos_dir"
+  if [ -n "$nysos_rest" ]; then
+    nysos_rest="$nysos_rest:"
+    while [ -n "$nysos_rest" ]; do
+      nysos_part=${{nysos_rest%%:*}}
+      nysos_rest=${{nysos_rest#*:}}
+      if [ "$nysos_part" != "$nysos_dir" ]; then
+        nysos_path="$nysos_path:$nysos_part"
+      fi
+    done
+  fi
+  export PATH="$nysos_path"
+}}
+_nysos_prepend_path
+unset -f _nysos_prepend_path"#
         );
         if includes(shell, ShellTarget::Bash) {
             for file in locations.bash_files() {
@@ -340,7 +359,10 @@ mod tests {
                 .arg(rc)
                 .env("HOME", &paths.home)
                 .env("ZDOTDIR", &paths.zsh)
-                .env("PATH", "/usr/bin:/bin")
+                .env(
+                    "PATH",
+                    format!("/usr/bin:{}:/bin:{}", bin.display(), bin.display()),
+                )
                 .output()
                 .expect("Shell tests require Bash and Zsh; use nix develop");
             assert!(
@@ -349,6 +371,10 @@ mod tests {
                 String::from_utf8_lossy(&output.stderr)
             );
             let stdout = String::from_utf8(output.stdout).unwrap();
+            assert_eq!(
+                stdout.lines().next().unwrap(),
+                format!("{}:/usr/bin:/bin", bin.display())
+            );
             assert_eq!(
                 stdout
                     .lines()

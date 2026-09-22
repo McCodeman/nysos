@@ -11,16 +11,17 @@ ARGS ?=
 DOCS_ADDR ?= 127.0.0.1:8000
 PREFIX ?= $(HOME)/.local
 MANDIR ?= $(PREFIX)/share/man
+PACKAGE_PLATFORM ?= linux-amd64
 DESTDIR ?=
 
-.PHONY: help build release run install check test test-focus test-tmux fmt lint verify hooks \
+.PHONY: help build release run install check test test-focus test-tmux test-layout fmt lint verify hooks \
 	docs-setup docs-generate docs-check docs-build docs-serve man man-install \
-	clean docs-clean dev nix-build nix-check nix-fmt license-check sbom sbom-check
+	clean docs-clean dev nix-build nix-check nix-fmt license-check sbom sbom-check package package-linux package-check test-install workflow-check
 
 ##@ Help
 help: ## Show grouped targets and common overrides (default)
 	@awk 'BEGIN { FS = ":.*## "; print "Usage: make <target> [VARIABLE=value]" } /^##@ / { printf "\n%s\n", substr($$0, 5) } /^[a-zA-Z0-9_-]+:.*## / { printf "  %-18s %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
-	@printf '\nOverrides: ARGS, DOCS_ADDR, PREFIX, MANDIR, DESTDIR, CARGO, UV, NIX\n'
+	@printf '\nOverrides: ARGS, DOCS_ADDR, PREFIX, MANDIR, DESTDIR, CARGO, UV, NIX, PACKAGE_PLATFORM\n'
 	@printf 'Example:   make run ARGS="--config examples/demo.toml"\n'
 
 ##@ Nix toolchain
@@ -46,8 +47,8 @@ release: ## Build the optimized binary in target/release
 run: ## Run nysos; pass CLI options with ARGS='...'
 	$(CARGO) run --locked -- $(ARGS)
 
-install: ## Install the binary with Cargo (uses CARGO_HOME, not PREFIX)
-	$(CARGO) install --locked --path .
+install: ## Build and replace the local Cargo binary (uses CARGO_HOME, not PREFIX)
+	$(CARGO) install --locked --force --path .
 
 ##@ Quality and Git hooks
 check: ## Type-check all Rust targets
@@ -62,18 +63,22 @@ test-focus: build ## Verify Alt-arrow and Ghostty Option-arrow focus through a r
 test-tmux: build ## Test prefixes, cues, mouse, and resize through a private tmux client
 	python3 scripts/test_tmux.py
 
+test-layout: build ## Test nested resizing, terminal zoom dimensions, and mouse fallback through tmux
+	python3 scripts/test_layout.py
+
 fmt: ## Format Rust source files
 	$(CARGO) fmt --all
 
 lint: ## Run Clippy with warnings treated as errors
 	$(CARGO) clippy --locked --all-targets -- -D warnings
 
-verify: license-check ## Check formatting, lint, tests, demo config, and generated references
+verify: license-check workflow-check ## Check formatting, lint, tests, demo config, and generated references
 	$(CARGO) fmt --all -- --check
 	$(CARGO) clippy --locked --all-targets -- -D warnings
 	$(CARGO) test --locked
 	$(CARGO) run --locked -- --config examples/demo.toml --check
 	$(CARGO) run --locked -- --config examples/pane-transitions.toml --check
+	$(CARGO) run --locked -- --config examples/nested-layout.toml --check
 	$(MAKE) docs-check
 
 hooks: ## Activate the pre-commit hook for this Git repository
@@ -88,6 +93,26 @@ sbom: ## Generate and validate sbom/nysos.spdx.json from locked Cargo dependenci
 
 sbom-check: ## Validate the SPDX SBOM and check Cargo.lock coverage and metadata
 	$(UV) run --locked python scripts/sbom.py --check
+
+workflow-check: ## Lint GitHub Actions workflows and the release installer
+	actionlint .github/workflows/*.yml
+	shellcheck scripts/install.sh
+
+##@ Release packages
+package: ## Build a release archive and deb/rpm for PACKAGE_PLATFORM (Docker for Linux)
+	python3 scripts/package.py --platform "$(PACKAGE_PLATFORM)"
+	python3 scripts/package.py --checksums-only
+
+package-linux: ## Build Linux x86-64 and ARM64 tarballs, Debian packages, and RPMs
+	python3 scripts/package.py --platform linux-amd64
+	python3 scripts/package.py --platform linux-arm64
+	python3 scripts/package.py --checksums-only
+
+package-check: ## Install/test built artifacts for PACKAGE_PLATFORM in disposable containers
+	python3 scripts/test_packages.py --platform "$(PACKAGE_PLATFORM)"
+
+test-install: ## Test the download installer, checksum failures, and repeat installs offline
+	python3 scripts/test_install.py
 
 ##@ Documentation and manual
 # Python tooling stays separate from Rust verification and the pre-commit hook.

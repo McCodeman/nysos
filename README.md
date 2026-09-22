@@ -25,7 +25,8 @@ Use `nysos --version` or `--version-full` for the UTC build timestamp and Git/bu
 
 Plain `nysos` opens two interactive shells with an empty cue list. Use
 `nysos --demo` to load the built-in six-cue example of changing pane titles and
-themes. `nysos --init demo.toml` exports that example for editing.
+themes across three panes: Service on the left, Observer above Notes on the right.
+`nysos --init demo.toml` exports that example for editing.
 
 Install with Homebrew on macOS or Linux:
 
@@ -41,14 +42,39 @@ using Homebrew's Rust dependency; Nix is not required. It also installs
 For optional Bash and Zsh completions, run `nysos --install-completions` and
 reopen your terminal.
 
+### Linux packages and release installer
+
+The release pipeline builds `.deb` (apt), `.rpm` (dnf/yum/zypper), and portable
+Linux archives for x86-64 and ARM64, plus macOS archives. The historical v0.1.1
+release has no binary assets; use source installation until a new release is
+published. Once available, the download installer can be run with:
+
+```sh
+NYSOS_INSTALLER=$(mktemp)
+curl --proto '=https' --tlsv1.2 -fsSL \
+  https://github.com/McCodeman/nysos/releases/latest/download/install.sh \
+  -o "$NYSOS_INSTALLER" && sh "$NYSOS_INSTALLER"
+export PATH="$HOME/.local/bin:$PATH"
+nysos --demo
+```
+
+It verifies SHA-256 checksums and installs without sudo. See
+[installation and packages](docs/guide/installation.md) for apt/dnf commands,
+pinned versions, PATH, and upgrade/removal instructions. The
+[Getting Started walkthrough](docs/guide/getting-started.md) covers preview,
+execution, editing, navigation, and resizing using the installed command.
+
 ### Build from source
 
 Install [Nix](https://nixos.org/download/), then use the locked toolchain:
 
 ```sh
-nix develop
-make build
-make run
+git clone https://github.com/McCodeman/nysos.git
+cd nysos
+nix develop --command make install
+export PATH="${CARGO_HOME:-$HOME/.cargo}/bin:$PATH"
+nysos --add-to-path --install-completions
+nysos --demo
 ```
 
 With direnv installed and its shell hook enabled, run `direnv allow` once in
@@ -69,9 +95,9 @@ when tmux/SSH hides the terminal identity, or `standard` to preserve Alt-B/F.
 Click or use Alt-Left/Right to focus panes; drag shared borders to resize.
 
 ```sh
-cargo run -- --init demo.toml
-cargo run -- --config demo.toml --check
-make run ARGS='--config demo.toml'
+nysos --init demo.toml
+nysos --config demo.toml --check
+nysos --config demo.toml
 ```
 
 `--init` refuses to overwrite files. No demo file is loaded automatically. Each
@@ -85,6 +111,19 @@ nysos --add-to-path --install-completions
 ```
 
 Use the binary's full path if it is not yet on PATH. Reopen your terminal afterward.
+
+For local development alongside Homebrew, run `make install`, then once run
+`"${CARGO_HOME:-$HOME/.cargo}/bin/nysos" --add-to-path=zsh` and open a new shell.
+The Cargo binary takes precedence over Homebrew; repeat `make install` to test
+new changes. See [local installation](docs/development.md).
+
+For nested rows and columns, try `nysos --config examples/nested-layout.toml`.
+Layouts keep their proportions when the terminal's cell dimensions change,
+including font zoom. Drag shared borders or use Ctrl-G then `<`/`>` (width) and
+`-`/`+` (height); `--no-mouse` provides keyboard-only operation.
+Layouts and weights can be set globally or overridden per cue. Pane titles keep
+high contrast across all themes, including unfocused panes. See
+[layouts and resizing](docs/guide/layouts.md).
 
 Pane commands target a stable `id`; `title` controls the visible label. Each cue's
 commands can override `title` and `scheme` without restarting the pane:
@@ -105,7 +144,7 @@ commands = [
 ## Documentation
 
 Try the [pane transitions demo](examples/pane-transitions.toml) for six cues that
-change titles and themes independently in two live shells:
+change titles and themes independently in three live shells with nested rows and columns:
 
 ```sh
 nysos --config examples/pane-transitions.toml

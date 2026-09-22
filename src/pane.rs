@@ -451,8 +451,10 @@ mod tests {
     }
     #[cfg(unix)]
     #[test]
-    fn tabbed_output_stays_inside_pane_when_scrolling() {
+    fn tabbed_output_and_overlay_restoration_match_host_screen() {
         use ratatui::{Terminal, backend::CrosstermBackend};
+        // Exercise ANSI colors even in CI/agent environments with NO_COLOR set.
+        crossterm::style::force_color_output(true);
         let mut pane = Pane::spawn(PaneConfig {
             shell: crate::config::test_shell(),
             args: crate::config::test_shell_args(),
@@ -493,7 +495,7 @@ mod tests {
             },
         )
         .unwrap();
-        for _ in 0..12 {
+        for frame_index in 0..24 {
             let expected_buffer = terminal
                 .draw(|frame| {
                     frame.render_widget(
@@ -501,6 +503,18 @@ mod tests {
                         Rect::new(30, 4, 35, 8),
                     );
                     pane.render(area, frame.buffer_mut());
+                    if frame_index % 2 == 1 {
+                        let popup = Rect::new(33, 6, 27, 3);
+                        frame.render_widget(ratatui::widgets::Clear, popup);
+                        frame.render_widget(
+                            ratatui::widgets::Paragraph::new("Preview command")
+                                .block(ratatui::widgets::Block::bordered())
+                                .style(
+                                    Style::default().fg(Color::White).bg(Color::Rgb(28, 35, 48)),
+                                ),
+                            popup,
+                        );
+                    }
                 })
                 .unwrap()
                 .buffer
@@ -512,8 +526,19 @@ mod tests {
             for cell in outer.renderable_content().display_iter {
                 let x = cell.point.column.0 as u16;
                 let y = cell.point.line.0 as u16;
-                let expected = expected_buffer[(x, y)].symbol().chars().next().unwrap();
-                assert_eq!(cell.cell.c, expected, "host cell at {x},{y}");
+                let expected = &expected_buffer[(x, y)];
+                assert_eq!(
+                    cell.cell.c,
+                    expected.symbol().chars().next().unwrap(),
+                    "host cell at {x},{y}"
+                );
+                if let Color::Rgb(r, g, b) = expected.bg {
+                    assert_eq!(
+                        cell.cell.bg,
+                        ansi::Color::Spec(ansi::Rgb { r, g, b }),
+                        "host background at {x},{y} in frame {frame_index}"
+                    );
+                }
             }
             pane.parser
                 .advance(&mut pane.term, b"Finished demonstration\r\n");

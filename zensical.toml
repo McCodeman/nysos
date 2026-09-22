@@ -11,9 +11,11 @@ nav = [
   { "Home" = "index.md" },
   { "User guide" = [
     { "Getting started" = "guide/getting-started.md" },
+    { "Installation and packages" = "guide/installation.md" },
     { "PATH and completions" = "guide/shell-setup.md" },
     { "Presenting a demo" = "guide/presenting.md" },
     { "tmux and SSH" = "guide/tmux-ssh.md" },
+    { "Layouts and resizing" = "guide/layouts.md" },
     { "Controls and mouse" = "guide/controls.md" },
     { "Editing and saving" = "guide/editor.md" },
     { "Troubleshooting" = "guide/troubleshooting.md" },
@@ -33,3 +35,7 @@ features = ["navigation.sections", "navigation.footer", "content.code.copy"]
 [project.theme.font]
 text = ""
 code = ""
+
+[project.markdown_extensions]
+pymdownx.superfences = {}
+pymdownx.tabbed.alternate_style = true

@@ -95,12 +95,10 @@ fn main() -> Result<()> {
     }));
     enable_raw_mode()?;
     let _guard = TerminalGuard;
-    execute!(
-        io::stdout(),
-        EnterAlternateScreen,
-        EnableMouseCapture,
-        EnableBracketedPaste
-    )?;
+    execute!(io::stdout(), EnterAlternateScreen, EnableBracketedPaste)?;
+    if !args.no_mouse {
+        execute!(io::stdout(), EnableMouseCapture)?;
+    }
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
     terminal.clear()?;
     while !app.quit {
@@ -109,7 +107,10 @@ fn main() -> Result<()> {
         app.resize(ratatui::layout::Rect::new(0, 0, size.width, size.height))?;
         terminal.draw(|frame| app.draw(frame))?;
         if event::poll(Duration::from_millis(16))? {
-            app.event(event::read()?);
+            let input = event::read()?;
+            if !args.no_mouse || !matches!(input, event::Event::Mouse(_)) {
+                app.event(input);
+            }
         }
     }
     Ok(())

@@ -17,17 +17,21 @@ nysos \- Multi\-pane scripted and interactive terminal demonstrations
 .SH DESCRIPTION
 Run named, interactive shell panes alongside a manually advanced command
 queue.
-Configure layouts, colors, shells, and commands in a TOML demo file.
+Configure global and per\-cue pane layouts, sizing, colors, shells, and
+commands in a TOML demo file.
 Loading a demo never automatically executes its queued commands.
 .ie \n(.g .ds Aq \(aq
 .el .ds Aq '
 .SH OPTIONS
 .TP
 \fB\-\-demo\fR
-Load the built\-in six\-cue demo of independent pane titles and themes
+Load the built\-in six\-cue demo with three panes in nested columns and rows
 .TP
 \fB\-\-debug\-keys\fR
 Show the last key event and editor mode for shortcut troubleshooting
+.TP
+\fB\-\-no\-mouse\fR
+Disable mouse capture; use prefix then < / > for width or \- / + for height
 .TP
 \fB\-\-terminal\-keys\fR \fI<PROFILE>\fR
 Terminal key mappings: auto detects Ghostty from TERM_PROGRAM or TERM
@@ -127,7 +131,9 @@ Print version
 Start two interactive shells using SHELL, or /bin/sh, with an empty cue list.
 .TP
 .B nysos --demo
-Load the built-in six-cue demo showing independent pane titles and themes.
+Load the built-in six-cue demo: Service fills the left column; Observer and
+Notes
+are stacked in the right column. Cues change titles and themes independently.
 .TP
 .B nysos \-\-init demo.toml
 Create a starter file without overwriting an existing file.
@@ -249,7 +255,7 @@ Demo files use TOML. No file is automatically discovered. The top-level fields
 are title (nonempty text, default "nysos demo"), prefix (ctrl-g by default),
 header (boolean, default true), cue_list (boolean, default true),
 cue_width (16 to 60 columns, default 26, capped at half the available width),
-layout (columns, rows, or grid), panes, and
+layout (columns, rows, grid, or a nested layout table), panes, and
 queues. Omitted panes use the two interactive defaults; omitted queues are
 empty.
 Use queues = [] for an interactive-only demo with custom panes.
@@ -262,6 +268,14 @@ panes. The shell defaults to SHELL or /bin/sh; args defaults to an empty
 array;
 id defaults to shell; title defaults to id; scheme defaults to ocean; weight
 defaults to 1.
+.PP
+Each queue may also specify layout, using the same presets or tree schema as
+the global layout. It applies when executing or typing commands, not
+previewing
+or skipping. Omission retains the active arrangement. Full-demo apply restores
+the global layout. Resizing edits the active cue layout or, without an
+override,
+the global layout. Save to persist these changes.
 .PP
 Each queue table requires a nonempty name and one or more commands, with at
 most one command per pane within that queue. Repeated targets are rejected.
@@ -281,6 +295,41 @@ Paths are relative to the launch directory; configured paths do not expand
 shell variables or tilde. The --check option validates structure and
 references,
 not executable paths, directories, command syntax, or service availability.
+.SS Nested layouts and resizing
+A layout table is either a leaf with pane (stable pane ID), or a split with
+required direction (columns or rows) and children (2 to 16 nodes). Either node
+accepts weight (1 to 1000, default 1), relative to its parent. Root weight has
+no
+sizing effect. Every configured pane must appear exactly once. Maximum nesting
+depth is 16. Unknown fields and pane IDs are rejected. Pane-table weights
+apply
+only to presets; tree weights apply to custom layouts.
+.PP
+Columns divide width; rows divide height. They may be nested in any
+combination.
+The sidebar, header, and footer remain outside the tree. Saving persists node
+weights. Ctrl-G l replaces a custom tree with columns. Ctrl-G a adds a pane to
+the right, preserving the existing arrangement inside its group.
+.PP
+Drag a shared border to resize adjacent panes or nested groups. Font/window
+size
+changes recompute the layout from terminal cell dimensions and resize child
+PTYs.
+Stored proportions remain unchanged. Very small terminals may clip pane
+content.
+.PP
+Mouse input needs press, motion, and release forwarding from the terminal and
+any
+multiplexers. For tmux use set-option -g mouse on; over SSH allocate a PTY
+with -t.
+Support cannot be inferred from TERM alone. If dragging is unavailable, focus
+a
+shell and use Ctrl-G then < or > for width, - or + for height. The nearest
+split
+on that axis is resized. --no-mouse disables capture for the whole session.
+See docs/guide/layouts.md for compatibility details and
+examples/nested-layout.toml
+for a five-pane example.
 .SH ENVIRONMENT
 .TP
 .B SHELL
@@ -298,6 +347,17 @@ If either is present, local macOS Command-key sampling is disabled.
 Control the user shell installation locations. HOME must be absolute.
 A relative XDG_DATA_HOME is ignored; relative ZDOTDIR resolves from the launch
 working directory.
+.SH INSTALLATION
+Homebrew: brew install mccodeman/tap/nysos. Source: clone the repository, then
+nix develop --command make install; add the Cargo bin directory to PATH.
+Release assets provide Linux amd64/arm64 Debian (.deb), RPM (.rpm), and
+portable
+archives, plus macOS archives. The release install.sh downloads and verifies
+the
+archive against SHA256SUMS, installing under HOME/.local without sudo.
+Older releases such as v0.1.1 lack these binary assets. See
+docs/guide/installation.md for package-manager commands, availability, and
+upgrades.
 .SH FILES
 .TP
 .B demo.toml
@@ -334,8 +394,9 @@ except for help, version, --init, --check, and shell setup options.
 .PP
 The source distribution contains user guides under docs/guide/.
 .SH BUILD INFORMATION
-The --version and --version-full switches report the package version, Git
-commit,
+The --version and --version-full switches report the package version, UTC
+build
+date/time, Git commit,
 exact tags, Git description, compiler, target, and build profile. The -V
 switch
 prints only the name and package version. Information is embedded at build

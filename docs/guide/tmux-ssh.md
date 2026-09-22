@@ -26,7 +26,11 @@ This affects that tmux server. Add `set -g mouse on` to your own tmux config onl
 if you want it for future servers. tmux's own borders/status bar remain controlled
 by tmux. Inside the nysos region, mouse reports reach nysos. Leave tmux copy mode
 to resume interacting with the app. Terminal resizes propagate through tmux to
-the shell panes.
+the shell panes, including changes to the reported cell dimensions after font zoom.
+Mouse support cannot be inferred reliably from TERM: custom bindings and nested
+multiplexers may consume reports. Use prefix then `<`/`>` or `-`/`+` to resize
+without mouse input, or `--no-mouse` to disable capture. The
+[layout guide](layouts.md#dragging-borders) describes compatibility and fallback.
 
 ## Choose another prefix
 

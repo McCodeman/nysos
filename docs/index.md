@@ -7,7 +7,9 @@ Present CLI demos with named, interactive shell panes and a prepared command
 queue. Run or skip each command when you are ready, edit commands before sending
 them, and open extra panes for questions or ad hoc exploration.
 
-- [Get started](guide/getting-started.md): build nysos and run your first demo.
+- [Get started](guide/getting-started.md): install nysos and walk through the three-pane demo.
+- [Installation](guide/installation.md): Homebrew, source, Linux packages, and release installer.
+- [Layouts](guide/layouts.md): nested rows/columns, global and per-cue sizing, mouse/keyboard resizing.
 - [Present a demo](guide/presenting.md): move between prepared and interactive work.
 - [Controls](guide/controls.md): keyboard shortcuts, pane resizing, and links.
 - [Edit and save](guide/editor.md): use the configuration modal during a demo.

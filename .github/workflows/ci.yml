@@ -15,26 +15,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@v21
-      - uses: DeterminateSystems/magic-nix-cache-action@v13
       - run: nix flake check --print-build-logs
       - run: nix develop --command make verify
-      - run: nix develop --command make test-focus test-tmux
+      - run: nix develop --command make test-focus test-tmux test-layout test-install
   docs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@v21
-      - uses: DeterminateSystems/magic-nix-cache-action@v13
       - run: nix develop --command make docs-build
   sbom:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@v21
-      - uses: DeterminateSystems/magic-nix-cache-action@v13
       - run: nix develop --command make sbom-check sbom
       - uses: actions/upload-artifact@v4
         with:
           name: nysos-spdx-sbom
           path: sbom/nysos.spdx.json
           if-no-files-found: error
+
+  packages:
+    uses: ./.github/workflows/packages.yml
+    with:
+      ref: ${{ github.sha }}

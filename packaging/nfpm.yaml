@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: Copyright 2026 Marshall Cody McCain (mccodeman@proton.me)
+# SPDX-License-Identifier: Apache-2.0
+
+name: nysos
+arch: ${NYSOS_PACKAGE_ARCH}
+platform: linux
+version: ${NYSOS_PACKAGE_VERSION}
+maintainer: Marshall Cody McCain <mccodeman@proton.me>
+description: Multi-pane scripted and interactive terminal demonstrations
+homepage: https://github.com/McCodeman/nysos
+license: Apache-2.0
+section: utils
+priority: optional
+contents:
+  - src: '${NYSOS_PACKAGE_ROOT}/bin/nysos'
+    dst: /usr/bin/nysos
+  - src: '${NYSOS_PACKAGE_ROOT}/share/man/man1/nysos.1'
+    dst: /usr/share/man/man1/nysos.1
+  - src: '${NYSOS_PACKAGE_ROOT}/share/bash-completion/completions/nysos'
+    dst: /usr/share/bash-completion/completions/nysos
+  - src: '${NYSOS_PACKAGE_ROOT}/share/zsh/site-functions/_nysos'
+    dst: /usr/share/zsh/site-functions/_nysos
+  - src: '${NYSOS_PACKAGE_ROOT}/share/doc/nysos/*'
+    dst: /usr/share/doc/nysos/
+  - src: '${NYSOS_PACKAGE_ROOT}/share/nysos/examples/*'
+    dst: /usr/share/nysos/examples/

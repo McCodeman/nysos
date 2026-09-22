@@ -6,9 +6,9 @@
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-EXCLUDED = {'.git', 'target', '.direnv', '.venv', 'site', '.cache', '__pycache__'}
+EXCLUDED = {'.git', 'target', '.direnv', '.venv', 'site', 'dist', '.cache', '__pycache__'}
 EXTENSIONS = {'.rs', '.py', '.sh', '.nix', '.toml', '.yml', '.yaml', '.md', '.roff', '.1'}
-SPECIAL = {'Makefile', '.envrc', '.gitignore', 'pre-commit'}
+SPECIAL = {'Dockerfile', '.dockerignore', 'Makefile', '.envrc', '.gitignore', 'pre-commit'}
 COPYRIGHT = 'Copyright 2026 Marshall Cody McCain (mccodeman@proton.me)'
 errors = []
 checked = 0

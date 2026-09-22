@@ -24,3 +24,6 @@ __pycache__/
 /result
 /result-*
 /.direnv/
+
+# Release archives and Linux packages
+/dist/

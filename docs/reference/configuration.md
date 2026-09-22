@@ -88,7 +88,7 @@ commands = [
 | `header` | Boolean | `true` | Show the demo title, cue index/name/description, and command index above the panes. When the cue list is focused, show its selection. |
 | `cue_list` | Boolean | `true` | Show the left cue sidebar; toggle with Ctrl-G, c. |
 | `cue_width` | Integer | `26` | Sidebar width including borders, 16–60 columns; capped at half the content width in small terminals. |
-| `layout` | String enum | `"columns"` | `"columns"`, `"rows"`, or `"grid"`. |
+| `layout` | String or layout table | `"columns"` | Preset `"columns"`, `"rows"`, `"grid"`, or a nested split tree (below). |
 | `panes` | Array of pane tables | Built-in `presenter` and `observer` panes | Between 1 and 16 pane definitions; their count determines pane count. |
 | `queues` | Array of queue tables | `[]` | Ordered queue items; an empty array is allowed. |
 
@@ -99,8 +99,10 @@ is invalid. No sample commands are inserted into files that omit `queues`.
 The omitted `panes` array creates `presenter` (ocean) and `observer` (ember),
 each with weight 1 and the normal shell/args/cwd defaults.
 `nysos --demo` explicitly loads the six-cue pane transitions example, using
-`service` and `observer` panes with `/bin/sh`. It demonstrates independent pane
-updates, updates to both panes, title-only overrides, and theme-only overrides.
+`service`, `observer`, and `notes` panes with `/bin/sh`. Service fills the left
+column; Observer and Notes are stacked in the right column. It demonstrates
+independent pane updates, updates to all three panes, title-only overrides, and
+theme-only overrides.
 `nysos --init demo.toml` exports this example; it refuses to overwrite a file.
 
 For a purely interactive single-pane demo:
@@ -160,7 +162,7 @@ See [tmux and SSH](../guide/tmux-ssh.md) for examples.
 | `args` | Array of strings | `[]` | Arguments passed directly to the shell executable, e.g. `["-l"]`. |
 | `cwd` | String | Inherit launch directory | Working directory for this pane. Omit for inheritance; TOML has no null value. |
 | `scheme` | String enum | `"ocean"` | `"ocean"`, `"ember"`, `"forest"`, or `"mono"`. |
-| `weight` | Integer | `1` | Relative size from 1 through 1000. |
+| `weight` | Integer | `1` | Relative size from 1 through 1000 for preset layouts. Nested layouts use weights on tree nodes instead. |
 
 Give every pane an explicit ID: two panes that omit `id` (and its legacy alias
 `name`) both become `shell` and fail validation. IDs are matched exactly, without
@@ -193,6 +195,53 @@ Weights are ratios, not percentages or fixed sizes. Two column panes weighted
 3 and 2 occupy approximately 60% and 40% of the available width, including their
 borders, after space for the header, footer, and cue list has been removed. Dragging a divider updates weights; save the demo to persist them.
 
+### Nested layout trees
+
+Instead of a preset string, use a table for `layout`. A node is either a pane
+reference or a split; rows and columns can nest in any combination. For example,
+this places a presenter on the left and stacks logs above notes on the right:
+
+```toml
+[layout]
+direction = "columns"
+children = [
+  { pane = "presenter", weight = 2 },
+  { direction = "rows", children = [{ pane = "logs" }, { pane = "notes" }] },
+]
+```
+
+Add `[[panes]]` definitions for those three IDs and then your `[[queues]]`.
+`layout = { direction = "columns", children = [...] }` is also valid inline-table
+syntax. Do not define both the preset string and `[layout]` in the same file.
+TOML fields after `[layout]` belong to it; put other top-level settings before it.
+
+| Node | Field | Type / default | Meaning |
+| --- | --- | --- | --- |
+| Pane | `pane` | Required string | Exact stable pane ID; not its display title. |
+| Pane or split | `weight` | Integer, default `1` | Relative share of its parent's width for columns or height for rows, from 1 through 1000. The root weight is validated but has no sizing effect. |
+| Split | `direction` | Required string | `"columns"` for left-to-right children; `"rows"` for top-to-bottom children. `"grid"` is only a preset, not a split direction. |
+| Split | `children` | Required array | Between 2 and 16 child nodes, each another pane reference or split. |
+
+Every configured pane must appear exactly once. Unknown, duplicate, and missing
+IDs are rejected. Pane nodes cannot also have `direction` or `children`; split
+nodes cannot have `pane`. Unknown fields are rejected. Maximum nesting depth is
+16 edges below the root. A single-pane tree can be `layout = { pane = "scratch" }`.
+
+Tree weights belong to sibling groups: a child split's weight sizes that entire
+group; its children's weights divide the resulting space. `[[panes]].weight`
+is ignored for tree geometry, but remains validated and available if you switch
+to a preset. The cue sidebar, header, and footer are outside the tree.
+
+Dragging nested dividers or using keyboard resizing changes node weights.
+Saving through the full editor persists the tree. The same schema may be used
+in a cue's optional `layout` field. Pane numbers and keyboard focus
+order still follow the `[[panes]]` array, even when its order differs from the tree.
+Adding an ad hoc pane appends it to a root column split with the average sibling
+weight, or wraps any other root with a new equally weighted column to the right.
+Ctrl-G, l replaces a custom tree with the columns preset.
+See [layouts and resizing](../guide/layouts.md) for a five-pane example, font-size
+behavior, keyboard controls, and terminal/mouse compatibility.
+
 ### Color schemes
 
 | Scheme | Appearance |
@@ -202,7 +251,9 @@ borders, after space for the header, footer, and cue list has been removed. Drag
 | `forest` | Pale green foreground, dark green background, green focus border |
 | `mono` | Gray foreground, near-black background, white focus border |
 
-Schemes control default pane colors and the focus border. Programs' ANSI colors
+Schemes control default pane colors and the focus border. Titles use a bold,
+high-contrast theme foreground independently of focus; all built-in title/background
+pairs exceed a 7:1 contrast ratio. Programs' ANSI colors
 are rendered separately. Custom RGB theme definitions are not supported yet.
 
 ## Queue fields: `[[queues]]`
@@ -212,6 +263,7 @@ are rendered separately. Custom RGB theme definitions are not supported yet.
 | `name` | String | Required | Label in the cue list and header; cannot be empty or whitespace-only. Cue names need not be unique. |
 | `description` | String | `""` | Free-form presenter-facing text in the header; empty or multiline text is accepted, but the fixed-height header can clip long text. |
 | `commands` | Array of command tables | Required | One or more commands, sent in listed order; each pane may appear at most once per cue. |
+| `layout` | Preset string or layout tree | Keep the active layout | Same schema as top-level `layout`. Applies on first dispatched command or `t`, with node weights controlling per-cue sizing. |
 
 Ctrl-G, n sends a single command. Enter in the cue sidebar sends all remaining
 commands of the selected item in order, without waiting for completion. Commands
@@ -309,7 +361,7 @@ Validation rejects malformed TOML, wrong value types, unknown fields/enum values
 blank titles or titles containing control characters, cue widths outside 16–60,
 zero or more than 16 panes, duplicate or blank pane IDs, empty shells, weights
 outside 1–1000, missing/blank cue names, missing/empty command lists, repeated pane targets within a cue, unknown
-command targets, and blank commands or commands containing NUL/CR/LF. Integer
+command targets, invalid layout trees (including missing/duplicate/unknown pane references), and blank commands or commands containing NUL/CR/LF. Integer
 bounds are inclusive. A disabled sidebar still requires a valid `cue_width`.
 
 Validation does not execute anything or check shell syntax, executable
@@ -330,10 +382,39 @@ See [editing and saving](../guide/editor.md) for the save/load workflow.
 
 **Prefix, o**, or plain **o** in the cue list, edits a full document matching this
 reference. **e** in the cue list edits only one cue: `name`, `description`, and
-`commands`, without a `[[queues]]` heading. Top-level fields such as `title` and
-pane settings are not valid in that single-cue editor.
+`commands`, without a `[[queues]]` heading. The optional cue `layout` is valid there. Top-level demo `title` and `panes`
+definitions are not valid in that single-cue editor.
 
 Use Ctrl-L/F2 in the full editor to load an entire file, Ctrl-G/F4 to apply, or
 Ctrl-S/F3 to save and apply. Loading only previews; applying never executes queued
 commands. Saving normalizes TOML and drops comments; runtime queue progress is not
 saved. See [editing and saving](../guide/editor.md) for a step-by-step workflow.
+
+## Global and cue-specific layouts
+
+The top-level `layout` is the initial arrangement. A cue can provide its own
+preset or tree (including weights) without redefining panes:
+
+```toml
+[[queues]]
+name = "Focus the service"
+layout = { direction = "columns", children = [
+  { pane = "service", weight = 2 },
+  { direction = "rows", children = [{ pane = "observer" }, { pane = "notes" }] },
+] }
+commands = [{ pane = "service", command = "pwd" }]
+```
+
+All three pane IDs must exist in `[[panes]]`. The override applies when the first
+non-skipped command of that cue is dispatched, or when `t` types its commands.
+Preview, selection, and skip do not apply it. Omission keeps the active layout;
+there is no implicit reset on each cue. Full-demo apply/reload restores the
+global layout. To restore a specific arrangement during playback, explicitly
+repeat that layout in a later cue. Replaying a cue reapplies its override.
+
+Resizing or cycling the layout while a cue override is active edits that cue's
+layout in memory; without an override, it edits the global layout. Save the full
+demo to persist either. Node weights provide per-cue sizing; pane-table weights
+remain shared defaults for the preset layouts. Adding an ad hoc pane extends all
+explicit trees, including layouts in future cues. Removing a pane manually
+requires removing it from every tree and its command targets.

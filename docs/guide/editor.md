@@ -78,7 +78,7 @@ Matching shell sessions are preserved.
 ## A typical edit
 
 1. Press **prefix, o** to open the full demo as TOML.
-2. Edit `layout`, a pane's `scheme` or `weight`, or the command list.
+2. Edit global `layout`, a cue's optional `layout`, a pane's `scheme`, or the command list.
 3. Press **Ctrl-G** to apply in memory, or **Ctrl-S** to choose a save path.
 4. In the save prompt, edit the path with the arrow and Backspace keys, then
    press **Enter**. An existing file at that path is replaced.
@@ -101,7 +101,7 @@ and `commands` table without a `[[queues]]` heading.
 ## Diagnose keys in your actual session
 
 Run a freshly built nysos with `--debug-keys` (for example,
-`nix develop --command cargo run -- --debug-keys --config demo.toml`). The bottom
+`nysos --debug-keys --config demo.toml`). The bottom
 line shows the last key event and the current editor mode, even while a popup is
 open. It displays input on screen only; it does not write a key log. Avoid typing
 sensitive input while this diagnostic is enabled.
@@ -122,7 +122,7 @@ without `--debug-keys` to hide the diagnostic line.
 ## Change pane titles and themes per cue
 
 Run `nysos --config examples/pane-transitions.toml` from the source checkout for
-a six-cue example. It updates each pane independently, then updates both together;
+a six-cue example. It updates each pane independently, then updates all three together;
 it also demonstrates title-only and theme-only overrides alongside new commands.
 
 In the cue editor (`e`), add `title` and/or `scheme` to a command:
@@ -139,3 +139,17 @@ when you run or type the command, and persist until another command changes them
 Preview and skip leave the appearance unchanged. To set the initial title, edit
 `title` under `[[panes]]` in the full demo editor. Saving retains those initial
 values plus the cue overrides; applying the full demo restores its initial appearance.
+
+## Nested pane layouts
+
+Edit `[layout]` in the full demo editor to nest rows and columns. Pane leaves
+reference stable IDs from `[[panes]]`; each must appear exactly once. Applying a
+new layout keeps matching shell sessions. Save after dragging borders or using
+keyboard resizing to persist proportions. See [layouts and resizing](layouts.md)
+and the [node reference](../reference/configuration.md#nested-layout-trees).
+
+Cue layouts use the same preset strings or nested tree schema as the global
+layout. Node weights provide per-cue sizing. Preview/skip does not apply them;
+execution or `t` does. Once active, divider and keyboard resizing edits that
+cue's layout. Saving retains both global and cue layouts. Full-demo apply resets
+the active view to the global layout. Each tree must include every pane ID once.

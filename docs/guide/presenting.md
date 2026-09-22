@@ -60,14 +60,19 @@ the real shell. Scripted commands target the named pane regardless of focus.
 
 Use **prefix, a** to add and focus an `adhoc-N` pane using `$SHELL` (or `/bin/sh`).
 Use **prefix, o** to rename/configure it or save it for a later demo. There may be
-up to 16 panes. To remove one, delete its `[[panes]]` entry and update any commands
-that target it before applying the configuration.
+up to 16 panes. To remove one, delete its `[[panes]]` entry, remove its leaves from global and
+per-cue layout trees, and update any commands that target it before applying the configuration.
 
 ## Adjust the view
 
 Use **prefix, l** to cycle columns, rows, and grid, or edit `layout` in the modal.
-Drag shared pane borders to adjust weights. Grid rows stay equal height; widths
-within a row are adjustable. Resizing the host terminal resizes the PTYs too.
+Drag shared pane/group borders, or use prefix then `<`/`>` for width and `-`/`+`
+for height. Grid rows stay equal; nested trees permit row and column resizing.
+Font/window cell-size changes recalculate the layout and resize each PTY.
+A cue's optional `layout` applies when its commands are executed or typed, not
+previewed/skipped, and persists until another override or full-demo apply.
+Resizing while an override is active edits that cue's layout; otherwise it edits
+the global layout. See [layouts and resizing](layouts.md).
 These changes remain in memory until you save through the modal.
 
 ## Restart or finish
@@ -77,6 +82,6 @@ quits nysos and closes its shells. Detached background jobs may outlive a pane.
 There is no automatic save on exit.
 
 To replay from the beginning, open **prefix, o** and apply the demo again. This
-resets queue progress but retains sessions whose name, shell, arguments, and
+resets queue progress but retains sessions whose ID, shell, arguments, and
 working directory match. Shell state is therefore not reset by replay; restart
 panes or relaunch nysos if you need a fresh environment.

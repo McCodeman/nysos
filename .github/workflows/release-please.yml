@@ -20,6 +20,10 @@ concurrency:
 
 jobs:
   release:
+    outputs:
+      created: ${{ steps.release.outputs.release_created }}
+      tag: ${{ steps.release.outputs.tag_name }}
+      sha: ${{ steps.release.outputs.sha }}
     runs-on: ubuntu-latest
     steps:
       - uses: googleapis/release-please-action@8b8fd2cc23b2e18957157a9d923d75aa0c6f6ad5 # v4
@@ -62,20 +66,34 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_BRANCH: ${{ fromJSON(steps.release.outputs.pr || '{}').headBranchName }}
         run: gh workflow run ci.yml --ref "$RELEASE_BRANCH"
-      - name: Check out the release commit
-        if: steps.release.outputs.release_created == 'true'
-        uses: actions/checkout@v4
+  packages:
+    needs: release
+    if: needs.release.outputs.created == 'true'
+    uses: ./.github/workflows/packages.yml
+    with:
+      ref: ${{ needs.release.outputs.sha }}
+  publish:
+    needs: [release, packages]
+    if: needs.release.outputs.created == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
         with:
-          ref: ${{ steps.release.outputs.sha }}
+          ref: ${{ needs.release.outputs.sha }}
       - uses: DeterminateSystems/nix-installer-action@v21
-        if: steps.release.outputs.release_created == 'true'
-      - name: Attach SPDX SBOM to the release
-        if: steps.release.outputs.release_created == 'true'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: packages-*
+          path: dist
+          merge-multiple: true
+      - name: Attach packages, checksums, installer, and SPDX before publishing
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ steps.release.outputs.tag_name }}
+          RELEASE_TAG: ${{ needs.release.outputs.tag }}
         run: |
           nix develop --command make sbom
-          gh release upload "$RELEASE_TAG" sbom/nysos.spdx.json --clobber
+          cp sbom/nysos.spdx.json scripts/install.sh dist/
+          nix develop --command python3 scripts/package.py --checksums-only
+          gh release upload "$RELEASE_TAG" dist/* --clobber
           gh release edit "$RELEASE_TAG" --draft=false

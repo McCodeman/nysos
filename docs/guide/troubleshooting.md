@@ -21,13 +21,21 @@
 | Full-editor shortcut seems ignored | Use Control, not macOS Command, and no prefix inside the modal. Try F2/F3/F4 (Fn may be required). Save/Apply keeps the editor open for invalid TOML; read the error below the text. Confirm a load/save path with Enter. |
 | Save failed | Check the destination's parent directory and write access. Paths are literal: use an absolute path instead of `~`. |
 
+| Old demo or missing new features | Check `command -v nysos` and `nysos --version-full`. A Homebrew/system binary may be older than a Cargo build. Reinstall the method you intend to use and check PATH precedence. |
+| Preview leaves colored blocks | Update to the pane-rendering fix; older releases emitted literal tabs that could corrupt redraws. |
+| Mouse drag does nothing | Use `--no-mouse` and prefix `<`/`>` / `-`/`+`. For tmux enable `mouse on`; terminals can intercept reports. See [layouts](layouts.md). |
+| Layout fails validation | Each global/cue tree must contain every pane ID exactly once; splits need at least two children and positive weights. |
+| Layout changes on cue execution | That cue has a `layout` override. Omitted layouts retain the active arrangement; full-demo apply restores the global layout. |
+| Installer reports missing assets | Older releases, including v0.1.1, have no prebuilt packages. Use source installation or a newer release with assets. |
+| Installer reports checksum mismatch | Nothing is installed. Remove the downloaded archive and retry from the same release; do not bypass verification. |
+
 `--check` prints a success summary and exits 0 for structurally valid demos; errors
 exit 1. Invalid command-line options exit 2. See the [CLI reference](../reference/cli.md).
 
 ## Current limits
 
-This scaffold does not support arbitrary split trees, custom RGB theme definitions,
+Custom RGB theme definitions are not supported, nor are
 graphics protocols, clipboard escape-sequence integration, terminal text selection,
-or automatic command completion. Grid rows have equal height. Direct shell sessions
+or automatic command-completion detection. Nested row/column trees are supported; preset grid rows have equal height. Direct shell sessions
 are closed when their panes close; detached background jobs can remain running.
 Native Windows interaction is deferred.

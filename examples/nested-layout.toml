@@ -1,0 +1,69 @@
+# SPDX-FileCopyrightText: Copyright 2026 Marshall Cody McCain (mccodeman@proton.me)
+# SPDX-License-Identifier: Apache-2.0
+
+# Run: nysos --config examples/nested-layout.toml
+# The cue sidebar remains separate, on the far left.
+# +---------------------------+-------------+
+# | Presenter                 | Logs        |
+# +-------------+-------------+             |
+# | Build       | Tests       +-------------+
+# |             |             | Notes       |
+# +-------------+-------------+-------------+
+title = "Nested workspace"
+cue_width = 26
+
+[layout]
+direction = "columns"
+children = [
+  { direction = "rows", weight = 2, children = [
+    { pane = "presenter" },
+    { direction = "columns", children = [{ pane = "build" }, { pane = "tests" }] },
+  ] },
+  { direction = "rows", children = [{ pane = "logs" }, { pane = "notes" }] },
+]
+
+[[panes]]
+id = "presenter"
+title = "Presenter"
+shell = "/bin/sh"
+scheme = "ocean"
+
+[[panes]]
+id = "build"
+title = "Build"
+shell = "/bin/sh"
+scheme = "forest"
+
+[[panes]]
+id = "tests"
+title = "Tests"
+shell = "/bin/sh"
+scheme = "forest"
+
+[[panes]]
+id = "logs"
+title = "Logs"
+shell = "/bin/sh"
+scheme = "ember"
+
+[[panes]]
+id = "notes"
+title = "Notes"
+shell = "/bin/sh"
+scheme = "mono"
+
+[[queues]]
+name = "Introduce workspace"
+description = "Rows inside columns, and columns inside a row. Drag an inner or outer divider to resize."
+commands = [
+  { pane = "presenter", command = "printf 'Nested workspace demonstration\\n'" },
+  { pane = "logs", command = "printf 'No background services started\\n'" },
+]
+
+[[queues]]
+name = "Independent tasks"
+commands = [
+  { pane = "build", title = "Build · ready", command = "printf 'Build shell ready\\n'" },
+  { pane = "tests", title = "Tests · ready", command = "printf 'Test shell ready\\n'" },
+  { pane = "notes", command = "printf 'Prefix o edits this entire layout; prefix a adds an ad hoc pane.\\n'" },
+]

@@ -3,12 +3,12 @@
 
 # PATH and shell completions
 
-Install the binary in a lasting location first, then run the setup switches.
+Follow [installation](installation.md) to put the binary in a lasting location,
+then run the setup switches.
 They work without an interactive terminal and exit without starting a demo.
 
 ```sh
-make install
-"${CARGO_HOME:-$HOME/.cargo}/bin/nysos" --add-to-path --install-completions
+nysos --add-to-path --install-completions
 ```
 
 Both switches accept `bash`, `zsh`, or `all`. Omitting the value selects `all`.
@@ -45,7 +45,8 @@ its toolchain PATH; this installer is intended for use outside that shell.
 Paths containing spaces, apostrophes, dollar signs, or glob characters are quoted.
 Colons cannot be represented in a Unix PATH entry and are rejected, as are
 newlines and non-UTF-8 installation paths. Repeated startup loads do not duplicate
-the directory in PATH. If it is already present, its existing position is kept.
+the directory in PATH. If it is already present, it is moved ahead of other
+entries so the selected installation takes precedence.
 
 ## Files updated
 

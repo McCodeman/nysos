@@ -1,0 +1,55 @@
+# SPDX-FileCopyrightText: Copyright 2026 Marshall Cody McCain (mccodeman@proton.me)
+# SPDX-License-Identifier: Apache-2.0
+
+name: Release packages
+on:
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Commit or tag to package (no release is published)
+        type: string
+        default: main
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux-amd64
+          - runner: ubuntu-24.04-arm
+            platform: linux-arm64
+          - runner: macos-15-intel
+            platform: darwin-amd64
+          - runner: macos-15
+            platform: darwin-arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+      - uses: DeterminateSystems/nix-installer-action@v21
+      - name: Build archives and native Linux packages
+        env:
+          PACKAGE_PLATFORM: ${{ matrix.platform }}
+        run: nix develop --command make package PACKAGE_PLATFORM="$PACKAGE_PLATFORM"
+      - name: Check package installation and executable
+        env:
+          PACKAGE_PLATFORM: ${{ matrix.platform }}
+        run: nix develop --command python3 scripts/test_packages.py --platform "$PACKAGE_PLATFORM"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ matrix.platform }}
+          path: |
+            dist/*.tar.gz
+            dist/*.deb
+            dist/*.rpm
+          if-no-files-found: error

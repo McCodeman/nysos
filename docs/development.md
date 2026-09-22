@@ -106,10 +106,12 @@ separately by your Nix installation.
 make build
 make run ARGS='--config examples/demo.toml'
 make verify
+make test-layout
 make hooks
 ```
 
-`make verify` checks formatting, Clippy, unit/PTY tests, the example configuration,
+`make verify` checks source headers, workflow/installer lint, formatting, Clippy,
+unit/PTY tests, the example configurations,
 and generated CLI/manpage freshness. The pre-commit hook exports the Git index to
 a temporary directory and runs this inside the locked Nix shell against exactly the staged snapshot, including
 partially staged files. It reuses `target/pre-commit`. Stage regenerated reference
@@ -117,7 +119,25 @@ files alongside CLI changes. PTY tests need PTY access.
 
 `make build` writes `target/debug/nysos`; `make release` writes
 `target/release/nysos`. `make install` installs through Cargo and respects
-`CARGO_HOME`. `PREFIX` and `DESTDIR` affect the manpage installation only.
+`CARGO_HOME` (normally `~/.cargo`). It replaces the installed binary even when
+its version number has not changed. `PREFIX` and `DESTDIR` affect the manpage
+installation only.
+
+To test local changes while keeping Homebrew installed:
+
+```sh
+make install
+"${CARGO_HOME:-$HOME/.cargo}/bin/nysos" --add-to-path=zsh
+exec zsh -l
+command -v nysos
+nysos --version-full
+```
+
+The PATH setup is needed once; it moves the Cargo binary directory ahead of
+Homebrew in new shells, even if that directory was already on PATH. Use
+`--add-to-path=bash` for Bash. Subsequent `make install` runs update the binary
+used by `nysos` without changing the Homebrew package. If direnv has not loaded
+the toolchain, run `nix develop --command make install`.
 
 ## Documentation workflow
 
@@ -240,7 +260,8 @@ pull requests. Token-created PRs do not trigger ordinary PR workflows, so the
 release workflow explicitly dispatches **Build and docs** on the release branch.
 Review that run in Actions before merging; dispatch runs may not appear as normal
 PR-required checks. No personal access token is required. This setup does not
-publish to crates.io or attach prebuilt binaries.
+publish to crates.io. It now builds precompiled archives and Debian/RPM packages
+before publishing the release draft.
 
 After a release, update the separate
 [Homebrew tap](https://github.com/McCodeman/homebrew-tap) to the new tag archive,
@@ -307,3 +328,55 @@ Licensing changes apply to this source revision and future releases. Previously
 published tags and the Homebrew formula pinned to an older MIT-licensed commit
 retain their original licensing; update the tap's license together with its
 source revision when packaging a new Apache-2.0 release.
+
+`make test-layout` uses a private tmux server and a real client PTY to check nested
+mouse dragging, keyboard-only operation with `--no-mouse`, child `stty size`
+reports after terminal size changes, and saving/applying resized layout trees.
+It models the cell-size notifications produced by font zoom, without controlling
+a graphical terminal's font settings. SSH environment variables exercise the
+remote code path; this is not an end-to-end SSH network test.
+
+## Release archives and Linux packages
+
+The Nix development shell includes nFPM. Linux builds additionally need Docker
+with Buildx and a running daemon (Docker Desktop or OrbStack on macOS). The pinned
+Rust/Alpine image in `packaging/Dockerfile` builds static musl executables with an
+explicit target so build-time procedural macros remain dynamically loadable.
+The Linux archive runs on both musl and glibc distributions.
+
+```sh
+nix develop
+make package-linux
+make package-check PACKAGE_PLATFORM=linux-amd64
+make package-check PACKAGE_PLATFORM=linux-arm64
+make test-install
+```
+
+Outputs are in ignored `dist/`: two architectures, each with `.tar.gz`, `.deb`,
+and `.rpm`, plus `SHA256SUMS`. `make package PACKAGE_PLATFORM=darwin-arm64` builds
+a macOS archive on Apple Silicon; use `darwin-amd64` on Intel. All archives include
+the executable, manpage, Bash/Zsh completions, examples, LICENSE/NOTICE, and SPDX
+SBOM. Run `make sbom` if the locked dependency graph or package version changes.
+The CLI/doc generator remains the source for packaged completions and help.
+
+The reusable **Release packages** workflow builds on matching Linux/macOS runners.
+The release workflow creates a draft, waits for all package jobs, gathers their
+artifacts, adds `install.sh`, SPDX and `SHA256SUMS`, then publishes. This ordering
+supports immutable GitHub releases. A failed package job leaves the release a
+draft; inspect and rerun that failed workflow before publishing anything manually.
+The reusable workflow can also be dispatched for a commit/tag to build artifacts
+without publishing a release. The local packaging commands do not create tags,
+commits, GitHub releases, apt repositories, or yum repositories.
+
+`make package-check` installs Linux packages in disposable Debian, Ubuntu, and
+Fedora containers, then starts the portable binary's real PTY demo under Alpine.
+`make test-install` mocks HTTPS downloads locally and tests checksum rejection,
+missing assets, unsafe archive paths, repeated installation, and quoted prefixes.
+It does not download or install onto the host. The real installer modifies only
+the requested prefix and does not silently edit PATH or invoke sudo.
+
+The replay regression acknowledges each dispatched cue through its shell before
+sending another. Flooding macOS PTYs with dozens of unconsumed command lines can
+lose input under CI load, which previously made that test flaky. This does not
+add command-completion detection to the app. CI uses the standard Nix binary
+cache and does not require a FlakeHub account or its optional cache action.

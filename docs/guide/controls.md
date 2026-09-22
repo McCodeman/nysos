@@ -50,7 +50,9 @@ After **Ctrl-G**:
 | `0` | Show and focus the cue list |
 | `c` | Show/hide the cue list |
 | `1`–`9` | Focus a shell pane directly |
-| `l` | Cycle columns, rows, and grid |
+| `l` | Cycle columns, rows, and grid; a custom tree first becomes columns |
+| `<` / `>` | Narrow / widen focused pane or its nearest column group |
+| `-` / `+` | Shorten / heighten focused pane or its nearest row group |
 | `h` | Toggle the queue header |
 | `x` | Restart the focused shell, ending its current session |
 | `?` | Show help; Esc closes it |
@@ -61,7 +63,11 @@ reaches the focused shell without quitting nysos.
 
 Click a pane to focus it. Drag a shared divider to resize adjacent panes.
 In grid mode, horizontal widths are adjustable within each row; row heights
-remain equal. Terminal-window resizes propagate to every PTY.
+remain equal. Nested layouts support resizing inner panes and outer groups. Resizing changes
+the active cue override when one is in effect, otherwise the global layout.
+Font-size and terminal-window changes recompute proportions and propagate to every
+PTY. Use `--no-mouse` and the keyboard resizing controls when capture is unwanted
+or unavailable. See [layouts and resizing](layouts.md) for compatibility and limits.
 The wheel scrolls terminal history, or is forwarded to applications that
 request mouse input. Shift-wheel requests history scrolling, though some host
 terminals reserve Shift-mouse for their own selection/scrollback.

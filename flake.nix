@@ -105,6 +105,9 @@
               [
                 cargo
                 cargo-sbom
+                nfpm
+                actionlint
+                shellcheck
                 rustc
                 rustfmt
                 clippy

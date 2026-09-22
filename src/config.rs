@@ -19,13 +19,145 @@ pub struct Demo {
     pub queues: Vec<Queue>,
 }
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq)]
-#[serde(rename_all = "snake_case")]
+/// Presets remain compatible with existing files; a table defines a split tree.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(untagged)]
 pub enum Layout {
-    #[default]
+    Preset(LayoutPreset),
+    Tree(LayoutNode),
+}
+impl Default for Layout {
+    fn default() -> Self {
+        Self::Preset(LayoutPreset::Columns)
+    }
+}
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum LayoutPreset {
     Columns,
     Rows,
     Grid,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum Axis {
+    Columns,
+    Rows,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(untagged, deny_unknown_fields)]
+pub enum LayoutNode {
+    Pane {
+        pane: String,
+        #[serde(default = "unit_weight")]
+        weight: u16,
+    },
+    Split {
+        direction: Axis,
+        children: Vec<LayoutNode>,
+        #[serde(default = "unit_weight")]
+        weight: u16,
+    },
+}
+fn unit_weight() -> u16 {
+    1
+}
+impl LayoutNode {
+    pub fn weight(&self) -> u16 {
+        match self {
+            Self::Pane { weight, .. } | Self::Split { weight, .. } => *weight,
+        }
+    }
+    pub fn weight_mut(&mut self) -> &mut u16 {
+        match self {
+            Self::Pane { weight, .. } | Self::Split { weight, .. } => weight,
+        }
+    }
+    fn validate<'a>(
+        &'a self,
+        ids: &HashSet<&str>,
+        seen: &mut HashSet<&'a str>,
+        depth: usize,
+    ) -> Result<()> {
+        if depth > 16 {
+            bail!("Layout nesting must not exceed 16 levels");
+        }
+        if !(1..=1000).contains(&self.weight()) {
+            bail!("Layout weights must be from 1 to 1000");
+        }
+        match self {
+            Self::Pane { pane, .. } => {
+                if !ids.contains(pane.as_str()) {
+                    bail!("Unknown layout pane: {pane}");
+                }
+                if !seen.insert(pane) {
+                    bail!("Layout pane appears more than once: {pane}");
+                }
+            }
+            Self::Split { children, .. } => {
+                if !(2..=16).contains(&children.len()) {
+                    bail!("Layout splits need between 2 and 16 children");
+                }
+                for child in children {
+                    child.validate(ids, seen, depth + 1)?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+impl Layout {
+    pub fn validate(&self, ids: &HashSet<&str>) -> Result<()> {
+        if let Self::Tree(root) = self {
+            let mut seen = HashSet::new();
+            root.validate(ids, &mut seen, 0)?;
+            if &seen != ids {
+                bail!("Layout must reference every configured pane exactly once");
+            }
+        }
+        Ok(())
+    }
+    pub fn add_pane(&mut self, id: &str) {
+        if let Self::Tree(root) = self {
+            let mut new = LayoutNode::Pane {
+                pane: id.into(),
+                weight: 1,
+            };
+            if let LayoutNode::Split {
+                direction: Axis::Columns,
+                children,
+                ..
+            } = root
+            {
+                // Dragging normalizes weights into the hundreds. A default of
+                // one would make the new pane nearly invisible in that group.
+                *new.weight_mut() = (children
+                    .iter()
+                    .map(|child| u32::from(child.weight()))
+                    .sum::<u32>()
+                    / children.len() as u32)
+                    .max(1) as u16;
+                children.push(new);
+            } else {
+                let mut previous = root.clone();
+                *previous.weight_mut() = 1;
+                *root = LayoutNode::Split {
+                    direction: Axis::Columns,
+                    children: vec![previous, new],
+                    weight: 1,
+                };
+            }
+        }
+    }
+    pub fn cycle(&mut self) {
+        *self = Self::Preset(match self {
+            Self::Preset(LayoutPreset::Columns) => LayoutPreset::Rows,
+            Self::Preset(LayoutPreset::Rows) => LayoutPreset::Grid,
+            _ => LayoutPreset::Columns,
+        });
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -59,6 +191,8 @@ pub struct Queue {
     #[serde(default)]
     pub description: String,
     pub commands: Vec<Command>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layout: Option<Layout>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -117,7 +251,7 @@ impl Default for Demo {
             header: true,
             cue_list: true,
             cue_width: 26,
-            layout: Layout::Columns,
+            layout: Layout::default(),
             panes: vec![
                 PaneConfig {
                     id: "presenter".into(),
@@ -135,6 +269,19 @@ impl Default for Demo {
 }
 
 impl Demo {
+    pub fn layout_for(&self, cue: Option<usize>) -> &Layout {
+        cue.and_then(|i| self.queues.get(i))
+            .and_then(|q| q.layout.as_ref())
+            .unwrap_or(&self.layout)
+    }
+    pub fn layout_for_mut(&mut self, cue: Option<usize>) -> &mut Layout {
+        if let Some(i) = cue
+            && self.queues.get(i).is_some_and(|q| q.layout.is_some())
+        {
+            return self.queues[i].layout.as_mut().unwrap();
+        }
+        &mut self.layout
+    }
     /// Explicitly selected sample, embedded so installation needs no example files.
     pub fn builtin() -> Result<Self> {
         Self::parse(include_str!("../examples/pane-transitions.toml"))
@@ -176,6 +323,7 @@ impl Demo {
                 bail!("Each pane needs a shell and a weight from 1 to 1000");
             }
         }
+        self.layout.validate(&names)?;
         for queue in &self.queues {
             queue.validate(&names)?;
         }
@@ -213,6 +361,9 @@ impl Demo {
 
 impl Queue {
     pub fn validate(&self, panes: &HashSet<&str>) -> Result<()> {
+        if let Some(layout) = &self.layout {
+            layout.validate(panes)?;
+        }
         if self.name.trim().is_empty() || self.commands.is_empty() {
             bail!("Each queue needs a name and at least one command");
         }
@@ -262,6 +413,7 @@ pub fn test_shell_args() -> Vec<String> {
 pub fn test_demo() -> Demo {
     Demo {
         queues: vec![Queue {
+            layout: None,
             name: "Welcome".into(),
             description: "Edit, run or skip these commands; every pane is a live shell.".into(),
             commands: vec![
@@ -285,6 +437,50 @@ pub fn test_demo() -> Demo {
 mod tests {
     use super::*;
     #[test]
+    fn nested_layout_round_trip_and_validation() {
+        let demo = Demo::parse(include_str!("../examples/nested-layout.toml")).unwrap();
+        let saved = toml::to_string_pretty(&demo).unwrap();
+        assert_eq!(Demo::parse(&saved).unwrap().layout, demo.layout);
+        for layout in [
+            r#"{ pane = "missing" }"#,
+            r#"{ pane = "presenter" }"#,
+            r#"{ direction = "rows", children = [{ pane = "presenter" }, { pane = "presenter" }] }"#,
+            r#"{ direction = "rows", children = [] }"#,
+            r#"{ direction = "rows", children = [{ pane = "presenter" }] }"#,
+            r#"{ direction = "grid", children = [{ pane = "presenter" }, { pane = "observer" }] }"#,
+            r#"{ direction = "rows", children = [{ pane = "presenter", weight = 0 }, { pane = "observer" }] }"#,
+            r#"{ direction = "rows", weight = 1001, children = [{ pane = "presenter" }, { pane = "observer" }] }"#,
+            r#"{ pane = "presenter", direction = "rows", children = [] }"#,
+            r#"{ pane = "presenter", typo = 1 }"#,
+        ] {
+            assert!(
+                Demo::parse(&format!("layout = {layout}")).is_err(),
+                "accepted {layout}"
+            );
+        }
+        for preset in ["columns", "rows", "grid"] {
+            assert!(Demo::parse(&format!("layout = \"{preset}\"")).is_ok());
+        }
+        let mut demo = Demo {
+            panes: vec![PaneConfig::default()],
+            layout: Layout::Tree(LayoutNode::Pane {
+                pane: "shell".into(),
+                weight: 1,
+            }),
+            ..Default::default()
+        };
+        demo.validate().unwrap();
+        for i in 1..16 {
+            let id = format!("extra-{i}");
+            demo.layout.add_pane(&id);
+            demo.panes.push(PaneConfig {
+                id,
+                ..Default::default()
+            });
+            demo.validate().unwrap();
+        }
+    }
+    #[test]
     fn sample_is_explicit_and_defaults_have_no_cues() {
         assert!(Demo::default().queues.is_empty());
         assert!(Demo::parse("").unwrap().queues.is_empty());
@@ -296,7 +492,20 @@ mod tests {
         );
         let demo = Demo::builtin().unwrap();
         assert_eq!(demo.queues.len(), 6);
-        assert_eq!(demo.panes.len(), 2);
+        assert_eq!(demo.panes.len(), 3);
+        let geometry = crate::layout::panes(
+            ratatui::layout::Rect::new(0, 0, 120, 40),
+            &demo.layout,
+            &demo.panes,
+        );
+        assert_eq!(
+            geometry.panes,
+            vec![
+                ratatui::layout::Rect::new(0, 0, 60, 40),
+                ratatui::layout::Rect::new(60, 0, 60, 20),
+                ratatui::layout::Rect::new(60, 20, 60, 20),
+            ]
+        );
         assert_eq!(demo.queues[1].commands.len(), 1);
         assert_eq!(demo.queues[2].commands.len(), 1);
         assert_ne!(

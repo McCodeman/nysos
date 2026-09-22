@@ -7,17 +7,21 @@
 
 ```text
 Run named, interactive shell panes alongside a manually advanced command queue.
-Configure layouts, colors, shells, and commands in a TOML demo file.
+Configure global and per-cue pane layouts, sizing, colors, shells, and commands in a
+TOML demo file.
 Loading a demo never automatically executes its queued commands.
 
 Usage: nysos [OPTIONS]
 
 Options:
       --demo
-          Load the built-in six-cue demo of independent pane titles and themes
+          Load the built-in six-cue demo with three panes in nested columns and rows
 
       --debug-keys
           Show the last key event and editor mode for shortcut troubleshooting
+
+      --no-mouse
+          Disable mouse capture; use prefix then < / > for width or - / + for height
 
       --terminal-keys <PROFILE>
           Terminal key mappings: auto detects Ghostty from TERM_PROGRAM or TERM
@@ -87,6 +91,7 @@ INTERACTIVE CONTROLS:
     n / Enter  Send next command       s  Skip next command
     e          Edit current queue     o  Edit full demo: title, cues, panes
     a          Add a live pane        Tab  Focus next pane
+    < / >      Narrow / widen pane    - / +  Shorten / heighten pane
     0          Focus cue list         c  Show/hide cue list
     ?          Show all controls      q  Quit and close shell sessions
   In the cue list: Up/Down selects, Enter sends a cue, e edits it, o edits the full

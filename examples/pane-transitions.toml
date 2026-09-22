@@ -9,7 +9,13 @@ title = "Independent pane titles and themes"
 header = true
 cue_list = true
 cue_width = 30
-layout = "columns"
+# Service fills the left column; Observer and Notes share the right column.
+[layout]
+direction = "columns"
+children = [
+  { pane = "service" },
+  { direction = "rows", children = [{ pane = "observer" }, { pane = "notes" }] },
+]
 
 [[panes]]
 id = "service"
@@ -25,24 +31,34 @@ shell = "/bin/sh"
 scheme = "mono"
 weight = 1
 
+[[panes]]
+id = "notes"
+title = "Notes · ready"
+shell = "/bin/sh"
+scheme = "forest"
+weight = 1
+
 [[queues]]
-name = "Introduce both shells"
-description = "Both panes get new titles, themes, and commands. Variables persist in their independent shells."
+name = "Introduce all three shells"
+description = "All three panes get new titles, themes, and commands. Variables persist in their independent shells."
 commands = [
   { pane = "service", title = "Service · setup", scheme = "forest", command = "DEMO_SERVICE=nysos; export DEMO_SERVICE; printf 'Service: %s\\n' \"$DEMO_SERVICE\"; pwd" },
   { pane = "observer", title = "Observer · environment", scheme = "ocean", command = "DEMO_ROLE=observer; export DEMO_ROLE; printf 'Role: %s\\n' \"$DEMO_ROLE\"; uname -s" },
+  { pane = "notes", title = "Notes · demo guide", scheme = "ocean", command = "printf 'Service on the left; Observer above Notes on the right.\\n'" },
 ]
 
 [[queues]]
 name = "Service only"
-description = "Only the service pane changes. The observer keeps its title, ocean theme, and shell state."
+description = "Widen the service column and update its title/theme. Observer and Notes retain their titles, themes, and shell state."
+layout = { direction = "columns", children = [{ pane = "service", weight = 2 }, { direction = "rows", children = [{ pane = "observer", weight = 1 }, { pane = "notes", weight = 1 }] }] }
 commands = [
   { pane = "service", title = "Service · inspecting", scheme = "ember", command = "printf 'Inspecting %s in %s\\n' \"$DEMO_SERVICE\" \"$PWD\"; ls -a" },
 ]
 
 [[queues]]
 name = "Observer only"
-description = "Only the observer changes. Its command demonstrates that the original shell is still running."
+description = "Give Observer more height in the right column and update its title/theme. The original shell is still running."
+layout = { direction = "columns", children = [{ pane = "service", weight = 1 }, { direction = "rows", children = [{ pane = "observer", weight = 2 }, { pane = "notes", weight = 1 }] }] }
 commands = [
   { pane = "observer", title = "Observer · healthy", scheme = "forest", command = "printf 'Role still set: %s\\nSimulated health check: OK\\n' \"$DEMO_ROLE\"; date" },
 ]
@@ -56,15 +72,17 @@ commands = [
 
 [[queues]]
 name = "Theme only"
-description = "Change only the observer theme and execute a command. Its healthy title remains."
+description = "Change only the Notes theme and execute a command. Its demo guide title remains."
 commands = [
-  { pane = "observer", scheme = "mono", command = "printf 'Observer summary for %s\\nNo external services were started.\\n' \"$DEMO_ROLE\"" },
+  { pane = "notes", scheme = "ember", command = "printf 'Drag borders to resize; Ctrl-G then < or > adjusts width, - or + adjusts height.\\n'" },
 ]
 
 [[queues]]
 name = "Finish together"
-description = "Both panes receive distinct final titles, themes, and commands. IDs remain service and observer throughout."
+description = "All three panes receive distinct final titles, themes, and commands. Their stable IDs remain unchanged."
+layout = { direction = "columns", children = [{ pane = "service", weight = 1 }, { direction = "rows", children = [{ pane = "observer", weight = 1 }, { pane = "notes", weight = 1 }] }] }
 commands = [
   { pane = "service", title = "Service · complete", scheme = "ocean", command = "printf 'Finished demonstration for %s\\n' \"$DEMO_SERVICE\"" },
   { pane = "observer", title = "Observer · complete", scheme = "ember", command = "printf 'Finished observation as %s\\n' \"$DEMO_ROLE\"" },
+  { pane = "notes", title = "Notes · complete", scheme = "forest", command = "printf 'Demo complete. Replay any cue with Enter.\\n'" },
 ]

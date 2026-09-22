@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    config::{Demo, Layout, PaneConfig, Queue},
+    config::{Axis, Demo, PaneConfig, Queue},
     cues::CueList,
     input, layout,
     pane::{Pane, palette},
@@ -56,6 +56,8 @@ pub struct App {
     pub active: usize,
     queue: usize,
     command: usize,
+    layout_cue: Option<usize>,
+    layout_applied: Option<usize>,
     pub path: PathBuf,
     prefix: bool,
     detected_terminal: crate::prefix::TerminalKeys,
@@ -69,7 +71,9 @@ pub struct App {
     last_key: String,
     status: String,
     rects: Vec<Rect>,
-    drag: Option<usize>,
+    viewport: Rect,
+    drag: Option<layout::Divider>,
+    dividers: Vec<layout::Divider>,
     cues: CueList,
 }
 impl App {
@@ -92,6 +96,8 @@ impl App {
             active: 0,
             queue: 0,
             command: 0,
+            layout_cue: None,
+            layout_applied: None,
             path,
             prefix: false,
             detected_terminal,
@@ -107,7 +113,9 @@ impl App {
                 "Keys: {terminal_label} · Prefix then ? for help · n runs the next command"
             ),
             rects: vec![],
+            viewport: Rect::default(),
             drag: None,
+            dividers: vec![],
             cues: CueList::default(),
         })
     }
@@ -118,6 +126,10 @@ impl App {
         Ok(())
     }
     pub fn resize(&mut self, area: Rect) -> Result<()> {
+        if self.viewport != area {
+            self.drag = None;
+            self.viewport = area;
+        }
         let header = if self.demo.header { 4 } else { 0 };
         let chunks = UiLayout::vertical([
             Constraint::Length(header),
@@ -134,7 +146,13 @@ impl App {
         let horizontal =
             UiLayout::horizontal([Constraint::Length(width), Constraint::Min(0)]).split(chunks[1]);
         self.cues.resize(horizontal[0], self.demo.queues.len());
-        self.rects = layout::panes(horizontal[1], self.demo.layout, &self.demo.panes);
+        let geometry = layout::panes(
+            horizontal[1],
+            self.demo.layout_for(self.layout_cue),
+            &self.demo.panes,
+        );
+        self.rects = geometry.panes;
+        self.dividers = geometry.dividers;
         for (pane, rect) in self.panes.iter_mut().zip(&self.rects) {
             pane.resize(inner(*rect))?;
         }
@@ -184,7 +202,7 @@ impl App {
                 .draw(frame, &self.demo.queues, self.queue, self.command);
         }
         for (i, (pane, &area)) in self.panes.iter().zip(&self.rects).enumerate() {
-            let (_, bg, accent) = palette(pane.config.scheme);
+            let (fg, bg, accent) = palette(pane.config.scheme);
             let title = format!(
                 " {} · {}{} ",
                 i + 1,
@@ -193,7 +211,13 @@ impl App {
             );
             frame.render_widget(
                 Block::bordered()
-                    .title(title)
+                    .title(Line::styled(
+                        title,
+                        Style::default()
+                            .fg(fg)
+                            .bg(bg)
+                            .add_modifier(ratatui::style::Modifier::BOLD),
+                    ))
                     .border_style(
                         Style::default().fg(if i == self.active && !self.cues.focused {
                             accent
@@ -207,7 +231,7 @@ impl App {
             pane.render(inner(area), frame.buffer_mut());
         }
         let status = if self.prefix {
-            "PREFIX: n run · s skip · e edit cue · o edit demo/add cues · a add · Tab focus · c cues · 0 focus cues · l layout · h header · x restart · q quit · ? help"
+            "PREFIX: n run · s skip · e edit cue · o edit demo/add cues · a add · Tab focus · c cues · 0 focus cues · <> width · -+ height · l layout · h header · x restart · q quit · ? help"
         } else {
             &self.status
         };
@@ -365,6 +389,12 @@ impl App {
         }
     }
     fn handle(&mut self, event: Event) -> Result<()> {
+        if matches!(
+            event,
+            Event::Key(_) | Event::Resize(_, _) | Event::FocusLost
+        ) {
+            self.drag = None;
+        }
         if let Event::Key(key) = event
             && key.kind == KeyEventKind::Release
         {
@@ -425,13 +455,30 @@ impl App {
                         KeyCode::Char('a') => self.add_pane()?,
                         KeyCode::Tab | KeyCode::Right => self.rotate(1),
                         KeyCode::BackTab | KeyCode::Left => self.rotate(-1),
+                        KeyCode::Char(c @ ('<' | '>' | '-' | '+')) => {
+                            let (axis, delta) = match c {
+                                '<' => (Axis::Columns, -2),
+                                '>' => (Axis::Columns, 2),
+                                '-' => (Axis::Rows, -1),
+                                _ => (Axis::Rows, 1),
+                            };
+                            let changed = !self.cues.focused
+                                && self.rects.get(self.active).is_some_and(|rect| {
+                                    layout::resize_focused(
+                                        &mut self.demo,
+                                        self.layout_cue,
+                                        &self.dividers,
+                                        *rect,
+                                        axis,
+                                        delta,
+                                    )
+                                });
+                            self.status = if changed { "Pane resized · save the full demo to keep its layout" } else { "Focus a shell with a resizable split on that axis; use prefix o to edit layout" }.into();
+                        }
                         KeyCode::Char('h') => self.demo.header = !self.demo.header,
                         KeyCode::Char('l') => {
-                            self.demo.layout = match self.demo.layout {
-                                Layout::Columns => Layout::Rows,
-                                Layout::Rows => Layout::Grid,
-                                Layout::Grid => Layout::Columns,
-                            }
+                            self.demo.layout_for_mut(self.layout_cue).cycle();
+                            self.drag = None;
                         }
                         KeyCode::Char('x') if !self.cues.focused => {
                             self.panes[self.active] =
@@ -542,6 +589,7 @@ impl App {
                 );
             }
         }
+        self.apply_cue_layout(self.cues.selected)?;
         for (index, command) in &commands {
             self.panes[*index].paste(command)?;
             let action = self.demo.queues[self.cues.selected]
@@ -554,6 +602,14 @@ impl App {
         self.active = *first;
         self.cues.focused = false;
         self.status = "Typed without Enter · edit in each shell · cue progress unchanged".into();
+        Ok(())
+    }
+    fn apply_cue_layout(&mut self, index: usize) -> Result<()> {
+        if self.demo.queues[index].layout.is_some() {
+            self.layout_cue = Some(index);
+            self.drag = None;
+            self.resize(self.viewport)?;
+        }
         Ok(())
     }
     fn edit_queue(&mut self, index: usize) -> Result<()> {
@@ -627,6 +683,9 @@ impl App {
                 );
             }
         }
+        if start == 0 {
+            self.layout_applied = None;
+        }
         self.queue = index;
         self.command = start;
         while self.queue == index {
@@ -640,21 +699,27 @@ impl App {
             self.status = "Demo complete".into();
             return Ok(());
         };
-        let command = &queue.commands[self.command];
+        let command = queue.commands[self.command].clone();
+        let command_count = queue.commands.len();
         if !skip {
+            if self.layout_applied != Some(self.queue) {
+                self.apply_cue_layout(self.queue)?;
+                self.layout_applied = Some(self.queue);
+            }
             let pane = self
                 .panes
                 .iter_mut()
                 .find(|p| p.config.id == command.pane)
                 .expect("validated target");
             pane.write(format!("{}\r", command.command).as_bytes())?;
-            pane.config.apply_command_style(command);
+            pane.config.apply_command_style(&command);
         }
         self.status.clear();
         self.command += 1;
-        if self.command == queue.commands.len() {
+        if self.command == command_count {
             self.queue += 1;
             self.command = 0;
+            self.layout_applied = None;
         }
         if !self.cues.focused {
             self.cues.select(self.queue, self.demo.queues.len());
@@ -674,6 +739,13 @@ impl App {
             ..Default::default()
         };
         let pane = Pane::spawn(config.clone())?;
+        self.demo.layout.add_pane(&config.id);
+        for cue in &mut self.demo.queues {
+            if let Some(layout) = &mut cue.layout {
+                layout.add_pane(&config.id);
+            }
+        }
+        self.drag = None;
         self.demo.panes.push(config);
         self.panes.push(pane);
         self.active = self.panes.len() - 1;
@@ -710,6 +782,9 @@ impl App {
             self.panes.push(pane);
         }
         self.demo = demo;
+        self.layout_cue = None;
+        self.layout_applied = None;
+        self.drag = None;
         self.active = self.active.min(self.panes.len() - 1);
         self.queue = 0;
         self.command = 0;
@@ -781,6 +856,7 @@ impl App {
                         let queue: Queue = toml::from_str(&editor.content())?;
                         queue.validate(&self.demo.panes.iter().map(|p| p.id.as_str()).collect())?;
                         self.demo.queues[index] = queue;
+                        self.layout_applied = None;
                         if index == self.queue {
                             self.command = 0;
                         }
@@ -811,16 +887,9 @@ impl App {
             self.drag = None;
         }
         if matches!(event.kind, MouseEventKind::Drag(MouseButton::Left))
-            && let Some(index) = self.drag
+            && let Some(divider) = &self.drag
         {
-            layout::resize_pair(
-                &mut self.demo.panes,
-                &self.rects,
-                self.demo.layout,
-                index,
-                x,
-                y,
-            );
+            layout::resize_pair(&mut self.demo, self.layout_cue, divider, x, y);
             return Ok(());
         }
         if self.demo.cue_list && self.cues.area.contains((x, y).into()) {
@@ -846,14 +915,12 @@ impl App {
             self.active = index;
             self.cues.focused = false;
             if !body.contains((x, y).into()) {
-                let vertical = self.demo.layout == Layout::Rows;
-                if (vertical && y == rect.bottom().saturating_sub(1))
-                    || (!vertical && x == rect.right().saturating_sub(1))
-                {
-                    self.drag = Some(index);
-                } else if index > 0 && ((vertical && y == rect.y) || (!vertical && x == rect.x)) {
-                    self.drag = Some(index - 1);
-                }
+                self.drag = self
+                    .dividers
+                    .iter()
+                    .rev()
+                    .find(|d| d.contains(x, y))
+                    .cloned();
                 return Ok(());
             }
             if event
@@ -922,7 +989,7 @@ fn open_url(url: &str) -> Result<()> {
     });
     Ok(())
 }
-const HELP: &str = "Every pane is a live PTY shell. Type normally; Ctrl-C reaches the shell.\n\nPress Ctrl-G, release, then:\n  n / Enter    Send the next command and advance\n  s            Skip the next command\n  e            Edit current queue item before running it\n  o            Edit full demo (title, add/reorder cues, panes, layout)\n  a            Add and focus an ad hoc shell\n  Tab / →      Focus next pane; Shift-Tab / ← goes back\n  0            Show and focus the cue list\n  c            Show/hide the cue list\n  1–9          Focus shell pane by number\n  l / h        Cycle layout / toggle header\n  x            Restart focused shell (ends its current session)\n  q            Quit and close all shells\n\nIn Cues: ↑/↓ browse, Enter sends the selected cue, e edits it; o edits the entire demo.\np previews the next command per pane; Esc closes, arrows scroll.\nt types those commands without Enter, then focuses the first target shell.\nTab/Esc returns to a shell. Enter resumes a partially sent current cue.\nCommands are dispatched in order without waiting for completion.\n\nAlt-Left/Right rotates focus, including Cues. Ghostty mappings also accept Alt-B/F. Click a pane to focus.\nDrag a shared border to resize. Grid rows are equal height.\nScroll wheel uses scrollback; Shift-wheel overrides application mouse mode.\nAlt-click opens HTTP(S) links. Cmd-click works locally on macOS outside tmux when the host forwards the click.\nOver SSH, URL openers run on the remote host.\n\nEditor: Ctrl-L load, Ctrl-S save as, Ctrl-G apply, Esc cancel.\nLoading previews the file; applying resets queue progress. Changing a pane\nid/shell/args/cwd creates a new session. Removed sessions are closed.\nCommands are sent to the pane's current foreground program: wait for its\nprompt before running the next command. No automatic completion detection.";
+const HELP: &str = "Every pane is a live PTY shell. Type normally; Ctrl-C reaches the shell.\n\nPress Ctrl-G, release, then:\n  n / Enter    Send the next command and advance\n  s            Skip the next command\n  e            Edit current queue item before running it\n  o            Edit full demo (title, add/reorder cues, panes, layout)\n  a            Add and focus an ad hoc shell\n  Tab / →      Focus next pane; Shift-Tab / ← goes back\n  0            Show and focus the cue list\n  c            Show/hide the cue list\n  1–9          Focus shell pane by number\n  l / h        Cycle layout / toggle header\n  x            Restart focused shell (ends its current session)\n  q            Quit and close all shells\n\nIn Cues: ↑/↓ browse, Enter sends the selected cue, e edits it; o edits the entire demo.\np previews the next command per pane; Esc closes, arrows scroll.\nt types those commands without Enter, then focuses the first target shell.\nTab/Esc returns to a shell. Enter resumes a partially sent current cue.\nCommands are dispatched in order without waiting for completion.\n\nAlt-Left/Right rotates focus, including Cues. Ghostty mappings also accept Alt-B/F. Click a pane to focus.\nDrag a shared border to resize nested groups. Prefix < / > changes width; - / + changes height. Grid rows are equal height.\nScroll wheel uses scrollback; Shift-wheel overrides application mouse mode.\nAlt-click opens HTTP(S) links. Cmd-click works locally on macOS outside tmux when the host forwards the click.\nOver SSH, URL openers run on the remote host.\n\nEditor: Ctrl-L load, Ctrl-S save as, Ctrl-G apply, Esc cancel.\nLoading previews the file; applying resets queue progress. Changing a pane\nid/shell/args/cwd creates a new session. Removed sessions are closed.\nCommands are sent to the pane's current foreground program: wait for its\nprompt before running the next command. No automatic completion detection.";
 
 #[cfg(all(test, unix))]
 mod tests {
@@ -944,32 +1011,65 @@ mod tests {
     fn builtin_final_cue_replays_on_every_enter() {
         let mut demo = Demo::builtin().unwrap();
         let dir = tempfile::tempdir().unwrap();
-        let paths = [dir.path().join("service"), dir.path().join("observer")];
+        let paths = [
+            dir.path().join("service"),
+            dir.path().join("observer"),
+            dir.path().join("notes"),
+        ];
         for pane in &mut demo.panes {
             pane.shell = crate::config::test_shell();
             pane.args = crate::config::test_shell_args();
         }
-        for (command, path) in demo
-            .queues
-            .last_mut()
-            .unwrap()
-            .commands
-            .iter_mut()
-            .zip(&paths)
-        {
-            command
-                .command
-                .push_str(&format!("; printf x >> '{}'", path.display()));
+        for cue in &mut demo.queues {
+            for command in &mut cue.commands {
+                let index = demo
+                    .panes
+                    .iter()
+                    .position(|p| p.id == command.pane)
+                    .unwrap();
+                command
+                    .command
+                    .push_str(&format!("; printf x >> '{}'", paths[index].display()));
+            }
         }
         let count = demo.queues.len();
         let mut app = App::new(demo, "demo.toml".into()).unwrap();
         app.cues.focused = true;
         app.resize(Rect::new(0, 0, 100, 30)).unwrap();
         let mut terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
+        let mut expected = vec![0; paths.len()];
         for _ in 0..count + 32 {
+            for command in &app.demo.queues[app.cues.selected].commands {
+                let index = app
+                    .demo
+                    .panes
+                    .iter()
+                    .position(|p| p.id == command.pane)
+                    .unwrap();
+                expected[index] += 1;
+            }
             key(&mut app, KeyCode::Enter, KeyModifiers::NONE);
-            app.tick().unwrap();
-            terminal.draw(|frame| app.draw(frame)).unwrap();
+            // Wait for actual shell acknowledgement, not an arbitrary sleep. A
+            // burst of dozens of long lines can overflow macOS's PTY input
+            // queue before a busy CI shell consumes them. Like a presenter,
+            // wait for this cue before sending the next one.
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+            loop {
+                app.tick().unwrap();
+                terminal.draw(|frame| app.draw(frame)).unwrap();
+                let lengths: Vec<_> = paths
+                    .iter()
+                    .map(|path| std::fs::read(path).unwrap_or_default().len())
+                    .collect();
+                if lengths == expected {
+                    break;
+                }
+                assert!(
+                    std::time::Instant::now() < deadline,
+                    "cue acknowledgement missing: {lengths:?}, expected {expected:?}"
+                );
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
         }
         assert_eq!(
             (app.queue, app.command, app.cues.selected),
@@ -978,26 +1078,73 @@ mod tests {
         assert!(app.cues.focused);
         assert_eq!(app.pane_preview("service").1, 1);
         assert_eq!(app.pane_preview("observer").1, 1);
-        for (pane, path) in app.panes.iter_mut().zip(&paths) {
-            pane.write(format!("printf done >> '{}'\r", path.display()).as_bytes())
-                .unwrap();
-        }
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
-        loop {
-            app.tick().unwrap();
-            let contents: Vec<_> = paths
-                .iter()
-                .map(|path| std::fs::read_to_string(path).unwrap_or_default())
-                .collect();
-            if contents.iter().all(|text| text.ends_with("done")) {
-                assert_eq!(contents, vec![format!("{}done", "x".repeat(33)); 2]);
-                break;
+        assert_eq!(expected, vec![36, 35, 35]);
+    }
+    #[test]
+    fn cue_layouts_apply_on_dispatch_and_type_without_overwriting_global_layout() {
+        use crate::config::{Layout, LayoutPreset};
+        let mut app = app();
+        let global = app.demo.layout.clone();
+        app.demo.queues[0].layout = Some(Layout::Preset(LayoutPreset::Rows));
+        app.demo.queues.push(app.demo.queues[0].clone());
+        app.demo.queues[1].layout = Some(global.clone());
+        app.cues.focused = true;
+        app.resize(Rect::new(0, 0, 120, 40)).unwrap();
+        key(&mut app, KeyCode::Char('p'), KeyModifiers::NONE);
+        assert!(app.layout_cue.is_none());
+        key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
+        app.step(true).unwrap();
+        assert!(app.layout_cue.is_none());
+        app.step(false).unwrap();
+        assert_eq!(app.layout_cue, Some(0));
+        assert_eq!(app.demo.layout, global);
+        assert!(app.rects[1].y > app.rects[0].y);
+        app.cues.select(1, 2);
+        app.type_selected().unwrap();
+        assert_eq!(app.layout_cue, Some(1));
+        assert_eq!(app.rects[1].y, app.rects[0].y);
+        let saved = toml::to_string_pretty(&app.demo).unwrap();
+        let reloaded = Demo::parse(&saved).unwrap();
+        assert_eq!(reloaded.layout, global);
+        assert_eq!(
+            reloaded.queues[0].layout,
+            Some(Layout::Preset(LayoutPreset::Rows))
+        );
+        app.apply(reloaded).unwrap();
+        assert!(app.layout_cue.is_none());
+    }
+    #[test]
+    fn inactive_pane_titles_use_high_contrast_theme_foregrounds() {
+        use crate::config::Scheme;
+        let mut app = app();
+        app.cues.focused = true;
+        app.resize(Rect::new(0, 0, 120, 40)).unwrap();
+        let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
+        let luminance = |color: Color| {
+            let Color::Rgb(r, g, b) = color else {
+                panic!("expected RGB theme")
+            };
+            let linear = |c: u8| {
+                let c = f64::from(c) / 255.0;
+                if c <= 0.04045 {
+                    c / 12.92
+                } else {
+                    ((c + 0.055) / 1.055).powf(2.4)
+                }
+            };
+            0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b)
+        };
+        for scheme in [Scheme::Ocean, Scheme::Ember, Scheme::Forest, Scheme::Mono] {
+            for pane in &mut app.panes {
+                pane.config.scheme = scheme;
             }
-            assert!(
-                std::time::Instant::now() < deadline,
-                "shell commands did not finish"
-            );
-            std::thread::sleep(std::time::Duration::from_millis(10));
+            terminal.draw(|frame| app.draw(frame)).unwrap();
+            let (fg, bg, _) = palette(scheme);
+            assert!((luminance(fg) + 0.05) / (luminance(bg) + 0.05) >= 7.0);
+            for rect in &app.rects {
+                let title = &terminal.backend().buffer()[(rect.x + 2, rect.y)];
+                assert_eq!((title.fg, title.bg), (fg, bg));
+            }
         }
     }
     #[test]
@@ -1118,6 +1265,7 @@ mod tests {
         app.step(true).unwrap();
         assert_eq!((app.queue, app.command), (0, 1));
         let queue = Queue {
+            layout: None,
             name: "edited".into(),
             description: "changed".into(),
             commands: vec![DemoCommand {
@@ -1177,6 +1325,25 @@ mod tests {
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
         assert_eq!((app.queue, app.command), (0, 0));
+    }
+    #[test]
+    fn dismissing_preview_restores_every_pane_cell() {
+        let mut app = app();
+        app.cues.focused = true;
+        for (width, height) in [(120, 30), (80, 24), (40, 12)] {
+            let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+            app.resize(Rect::new(0, 0, width, height)).unwrap();
+            terminal.draw(|frame| app.draw(frame)).unwrap();
+            let baseline = terminal.backend().buffer().clone();
+            for _ in 0..3 {
+                key(&mut app, KeyCode::Char('p'), KeyModifiers::NONE);
+                terminal.draw(|frame| app.draw(frame)).unwrap();
+                assert_ne!(terminal.backend().buffer(), &baseline);
+                key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
+                terminal.draw(|frame| app.draw(frame)).unwrap();
+                assert_eq!(terminal.backend().buffer(), &baseline);
+            }
+        }
     }
     #[test]
     fn cue_preview_tracks_remaining_commands_and_never_executes() {
@@ -1375,6 +1542,87 @@ mod tests {
                 .unwrap()
                 .contains("unknown field")
         );
+    }
+    #[test]
+    fn nested_layout_resize_keyboard_mouse_and_editor_preserve_sessions() {
+        let mut demo = Demo::parse(include_str!("../examples/nested-layout.toml")).unwrap();
+        for pane in &mut demo.panes {
+            pane.shell = crate::config::test_shell();
+            pane.args = crate::config::test_shell_args();
+        }
+        let mut app = App::new(demo, "demo.toml".into()).unwrap();
+        let area = Rect::new(0, 0, 146, 66);
+        app.resize(area).unwrap();
+        let original = app.rects.clone();
+        let original_layout = app.demo.layout.clone();
+        // Font zoom/window changes alter cell dimensions, never stored ratios.
+        for (w, h) in [(106, 46), (186, 86), (8, 4), (1, 1)] {
+            app.resize(Rect::new(0, 0, w, h)).unwrap();
+            let mut terminal = Terminal::new(TestBackend::new(w, h)).unwrap();
+            terminal.draw(|frame| app.draw(frame)).unwrap();
+            assert_eq!(app.demo.layout, original_layout);
+        }
+        app.resize(area).unwrap();
+        assert_eq!(app.rects, original);
+        // Width grows through the outer column; height through its nested row.
+        for (key_code, dimension) in [('>', 0), ('+', 1)] {
+            let before = app.rects[0];
+            key(&mut app, KeyCode::Char('g'), KeyModifiers::CONTROL);
+            key(&mut app, KeyCode::Char(key_code), KeyModifiers::NONE);
+            app.resize(area).unwrap();
+            if dimension == 0 {
+                assert!(app.rects[0].width > before.width);
+            } else {
+                assert!(app.rects[0].height > before.height);
+            }
+        }
+        let before = app.rects.clone();
+        let edge = before[1].right() - 1;
+        let row = before[1].y + 3;
+        for (kind, column) in [
+            (MouseEventKind::Down(MouseButton::Left), edge),
+            (MouseEventKind::Drag(MouseButton::Left), edge + 5),
+        ] {
+            app.mouse(MouseEvent {
+                kind,
+                column,
+                row,
+                modifiers: KeyModifiers::NONE,
+            })
+            .unwrap();
+        }
+        app.resize(area).unwrap();
+        assert!(app.rects[1].width > before[1].width);
+        assert_eq!(app.rects[0], before[0]);
+        assert_eq!(app.rects[3], before[3]);
+        // A terminal resize cancels dragging, so old coordinates cannot resize a new grid.
+        assert!(app.drag.is_some());
+        app.resize(Rect::new(0, 0, 126, 50)).unwrap();
+        assert!(app.drag.is_none());
+        let resized = app.demo.layout.clone();
+        let mut parser: alacritty_terminal::vte::ansi::Processor =
+            alacritty_terminal::vte::ansi::Processor::new();
+        parser.advance(&mut app.panes[0].term, b"KEEP_SESSION");
+        app.edit_demo().unwrap();
+        key(&mut app, KeyCode::Char('g'), KeyModifiers::CONTROL);
+        assert_eq!(app.demo.layout, resized);
+        assert!(
+            app.panes[0]
+                .term
+                .renderable_content()
+                .display_iter
+                .map(|c| c.cell.c)
+                .collect::<String>()
+                .contains("KEEP_SESSION")
+        );
+        app.add_pane().unwrap();
+        app.demo.validate().unwrap();
+        app.resize(area).unwrap();
+        assert!(app.rects.last().unwrap().width > 2);
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("nested.toml");
+        app.demo.save(&path).unwrap();
+        assert_eq!(Demo::load(&path).unwrap().layout, app.demo.layout);
     }
     #[test]
     fn mouse_focus_drag_add_and_small_terminal_render() {

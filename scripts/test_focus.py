@@ -4,6 +4,7 @@
 
 """Verify raw terminal encodings change the shell receiving subsequent input."""
 import fcntl
+import json
 import os
 from pathlib import Path
 import pty
@@ -18,16 +19,17 @@ def exercise(profile, program, term, ghostty):
     with tempfile.TemporaryDirectory(prefix='nysos-focus-') as directory:
         root = Path(directory)
         config = root / 'demo.toml'
-        config.write_text('''cue_list = false
+        shell = json.dumps(os.environ.get('NYSOS_TEST_BASH', '/bin/bash'))
+        config.write_text(f'''cue_list = false
     queues = []
     [[panes]]
     name = "first"
-    shell = "/bin/sh"
-    args = ["-c", "export NYSOS_FOCUS_TEST=first; exec /bin/sh"]
+    shell = {shell}
+    args = ["--noprofile", "--norc", "-c", 'export NYSOS_FOCUS_TEST=first; exec "$0" --noprofile --norc']
     [[panes]]
     name = "second"
-    shell = "/bin/sh"
-    args = ["-c", "export NYSOS_FOCUS_TEST=second; exec /bin/sh"]
+    shell = {shell}
+    args = ["--noprofile", "--norc", "-c", 'export NYSOS_FOCUS_TEST=second; exec "$0" --noprofile --norc']
     ''')
         master, slave = pty.openpty()
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 30, 100, 0, 0))

@@ -217,8 +217,8 @@ Use Conventional Commits for commits merged into `main` (or squash PR titles):
 
 The initial manifest records the existing 0.1.0 package. The bootstrap commit is
 `c74a829`; older commits used non-conventional messages and are excluded from
-initial automated release notes. This setup does not create a historical v0.1.0
-tag or publish a release immediately. The next qualifying commit opens a release
+initial automated release notes. The initial `v0.1.0` tag was subsequently signed with Sigstore and published.
+Release Please does not publish a new release immediately. The next qualifying commit opens a release
 PR; subsequent commits update it. Review its changelog and version, wait for CI,
 and merge it to publish the `vX.Y.Z` Git tag and GitHub release.
 
@@ -234,3 +234,38 @@ After a release, update the separate
 [Homebrew tap](https://github.com/McCodeman/homebrew-tap) to the new tag archive,
 checksum, and Git build metadata, following its maintenance instructions.
 Homebrew formula updates are currently manual.
+
+### Sigstore Git signatures
+
+This checkout signs commits and tags with `gitsign`. New clones can enable the
+same configuration inside `nix develop` (which includes gitsign):
+
+```sh
+git config --local gpg.x509.program gitsign
+git config --local gpg.format x509
+git config --local commit.gpgsign true
+git config --local tag.gpgsign true
+```
+
+Signing requires internet access and browser authentication. Signatures record
+the authenticated identity in Sigstore's public transparency log. Existing
+commits are not rewritten. Verify the first signed tag with:
+
+```sh
+gitsign verify-tag v0.1.0 \
+  --certificate-identity mccodeman@proton.me \
+  --certificate-oidc-issuer https://github.com/login/oauth
+```
+
+Release Please initially writes its PR through GitHub's API; the workflow then
+amends the generated release-branch commit with a Sigstore signature using GitHub
+Actions OIDC before dispatching CI. A lease prevents overwriting concurrent
+branch updates. The bot signer identity is the release workflow, not a personal
+email. Check that this signing step passes before accepting a release PR.
+
+GitHub UI squash/merge operations create new commits with GitHub's signing
+system, not Sigstore. To retain a Sigstore-signed release commit, fast-forward
+`main` locally to the reviewed release branch and push it; if main has advanced,
+let Release Please refresh its branch first. Locally created merge commits must
+also be signed. Release Please's automatically created release tags use its API
+and are not Sigstore-signed; the manually created `v0.1.0` tag is signed.

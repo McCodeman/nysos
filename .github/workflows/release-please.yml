@@ -9,6 +9,7 @@ permissions:
   issues: write
   pull-requests: write
   actions: write
+  id-token: write
 
 concurrency:
   group: release-please
@@ -23,6 +24,30 @@ jobs:
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+      - uses: actions/checkout@v4
+        if: steps.release.outputs.pr != ''
+        with:
+          ref: ${{ fromJSON(steps.release.outputs.pr || '{}').headBranchName }}
+          fetch-depth: 0
+      - uses: DeterminateSystems/nix-installer-action@v21
+        if: steps.release.outputs.pr != ''
+      - name: Sign the release PR commit with Sigstore
+        if: steps.release.outputs.pr != ''
+        env:
+          RELEASE_BRANCH: ${{ fromJSON(steps.release.outputs.pr || '{}').headBranchName }}
+          GITSIGN_TOKEN_PROVIDER: github-actions
+        run: |
+          case "$RELEASE_BRANCH" in
+            release-please--*) ;;
+            *) echo "Refusing to rewrite a non-release branch" >&2; exit 1 ;;
+          esac
+          previous=$(git rev-parse HEAD)
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git config gpg.format x509
+          git config gpg.x509.program gitsign
+          nix develop --command git commit --amend --no-edit --gpg-sign
+          git push --force-with-lease="refs/heads/$RELEASE_BRANCH:$previous" origin "HEAD:refs/heads/$RELEASE_BRANCH"
       # GITHUB_TOKEN-created PRs do not trigger pull_request workflows.
       # Explicit workflow_dispatch events do run with this token.
       - name: Validate the release PR

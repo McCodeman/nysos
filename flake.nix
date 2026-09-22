@@ -104,6 +104,7 @@
                 rust-analyzer
                 gnumake
                 git
+                gitsign
                 tmux
                 pkg-config
                 python313

@@ -10,6 +10,11 @@ Loading a demo never automatically executes its queued commands.
 Usage: nysos [OPTIONS]
 
 Options:
+      --terminal-keys <PROFILE>
+          Terminal key mappings: auto detects Ghostty from TERM_PROGRAM or TERM
+
+          [possible values: auto, standard, ghostty]
+
       --prefix <KEY>
           Override the demo control prefix (default: ctrl-g; avoids default tmux prefix)
 
@@ -75,7 +80,8 @@ INTERACTIVE CONTROLS:
     ?          Show all controls      q  Quit and close shell sessions
   In the cue list: Up/Down selects, Enter sends a cue, e edits it.
   Cue commands are sent in order without waiting for completion.
-  Alt-Left/Right rotates focus. Click to focus; drag dividers to resize.
+  Alt-Left/Right rotates focus; Ghostty mappings also accept Alt-B/F. Click to focus;
+  drag dividers to resize.
   Cmd-click opens URLs locally on macOS; Alt-click is the portable fallback.
 
 NOTES:

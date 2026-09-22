@@ -52,6 +52,7 @@ commands = [
 
 | Field | Type | Default when omitted | Meaning |
 | --- | --- | --- | --- |
+| `terminal_keys` | String enum | `"auto"` | `"auto"` detects Ghostty using TERM_PROGRAM/TERM; `"ghostty"` adds Alt-B/F focus aliases; `"standard"` preserves those shell keys. `--terminal-keys` overrides at startup. |
 | `prefix` | String enum | `"ctrl-g"` | Control prefix: `"ctrl-g"`, `"ctrl-a"`, `"ctrl-b"`, or `"f12"`. `--prefix` overrides it at startup. |
 | `header` | Boolean | `true` | Show queue item index, name, description, and next command above the panes. |
 | `cue_list` | Boolean | `true` | Show the left cue sidebar; toggle with Ctrl-G, c. |

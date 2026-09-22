@@ -55,6 +55,7 @@ pub struct App {
     command: usize,
     pub path: PathBuf,
     prefix: bool,
+    detected_terminal: crate::prefix::TerminalKeys,
     editor: Option<Editor>,
     pending_demo: Option<Demo>,
     help: bool,
@@ -73,6 +74,11 @@ impl App {
             .cloned()
             .map(Pane::spawn)
             .collect::<Result<_>>()?;
+        let detected_terminal = crate::prefix::TerminalKeys::detect(
+            std::env::var("TERM_PROGRAM").ok().as_deref(),
+            std::env::var("TERM").ok().as_deref(),
+        );
+        let terminal_label = demo.terminal_keys.resolve(detected_terminal).label();
         Ok(Self {
             demo,
             panes,
@@ -81,11 +87,14 @@ impl App {
             command: 0,
             path,
             prefix: false,
+            detected_terminal,
             editor: None,
             pending_demo: None,
             help: false,
             quit: false,
-            status: "Prefix then ? for help · n runs the next command".into(),
+            status: format!(
+                "Keys: {terminal_label} · Prefix then ? for help · n runs the next command"
+            ),
             rects: vec![],
             drag: None,
             cues: CueList::default(),
@@ -241,14 +250,21 @@ impl App {
         } else if self.help {
             let area = popup(area, 88, 85);
             frame.render_widget(Clear, area);
+            let help = HELP.replace(
+                "Press Ctrl-G",
+                &format!("Press {}", self.demo.prefix.label()),
+            );
+            let profile = self
+                .demo
+                .terminal_keys
+                .resolve(self.detected_terminal)
+                .label();
+            let title = format!(" nysos controls · keys: {profile} · Esc closes ");
             frame.render_widget(
-                Paragraph::new(HELP.replace(
-                    "Press Ctrl-G",
-                    &format!("Press {}", self.demo.prefix.label()),
-                ))
-                .block(Block::bordered().title(" nysos controls · Esc closes "))
-                .style(Style::default().bg(Color::Rgb(20, 26, 36)))
-                .wrap(Wrap { trim: false }),
+                Paragraph::new(help)
+                    .block(Block::bordered().title(title))
+                    .style(Style::default().bg(Color::Rgb(20, 26, 36)))
+                    .wrap(Wrap { trim: false }),
                 area,
             );
         } else if !self.cues.focused
@@ -347,10 +363,12 @@ impl App {
                     }
                 } else if self.demo.prefix.matches(key) {
                     self.prefix = true;
-                } else if key.modifiers.contains(KeyModifiers::ALT)
-                    && matches!(key.code, KeyCode::Left | KeyCode::Right)
-                {
-                    self.rotate(if key.code == KeyCode::Left { -1 } else { 1 });
+                } else if let Some(direction) = input::focus_direction(
+                    key,
+                    self.demo.terminal_keys.resolve(self.detected_terminal)
+                        == crate::prefix::TerminalKeys::Ghostty,
+                ) {
+                    self.rotate(direction);
                 } else if self.cues.focused {
                     self.cue_key(key)?;
                 } else {
@@ -749,7 +767,7 @@ fn open_url(url: &str) -> Result<()> {
     });
     Ok(())
 }
-const HELP: &str = "Every pane is a live PTY shell. Type normally; Ctrl-C reaches the shell.\n\nPress Ctrl-G, release, then:\n  n / Enter    Send the next command and advance\n  s            Skip the next command\n  e            Edit current queue item before running it\n  o            Open full demo editor (panes, queues, layout, shells)\n  a            Add and focus an ad hoc shell\n  Tab / →      Focus next pane; Shift-Tab / ← goes back\n  0            Show and focus the cue list\n  c            Show/hide the cue list\n  1–9          Focus shell pane by number\n  l / h        Cycle layout / toggle header\n  x            Restart focused shell (ends its current session)\n  q            Quit and close all shells\n\nIn Cues: ↑/↓ browse, Enter sends the selected cue, e edits it.\nTab/Esc returns to a shell. Enter resumes a partially sent current cue.\nCommands are dispatched in order without waiting for completion.\n\nAlt-Left/Right rotates focus (including Cues) without a prefix. Click a pane to focus.\nDrag a shared border to resize. Grid rows are equal height.\nScroll wheel uses scrollback; Shift-wheel overrides application mouse mode.\nAlt-click opens HTTP(S) links. Cmd-click works locally on macOS outside tmux when the host forwards the click.\nOver SSH, URL openers run on the remote host.\n\nEditor: Ctrl-L load, Ctrl-S save as, Ctrl-G apply, Esc cancel.\nLoading previews the file; applying resets queue progress. Changing a pane\nname/shell/args/cwd creates a new session. Removed sessions are closed.\nCommands are sent to the pane's current foreground program: wait for its\nprompt before running the next command. No automatic completion detection.";
+const HELP: &str = "Every pane is a live PTY shell. Type normally; Ctrl-C reaches the shell.\n\nPress Ctrl-G, release, then:\n  n / Enter    Send the next command and advance\n  s            Skip the next command\n  e            Edit current queue item before running it\n  o            Open full demo editor (panes, queues, layout, shells)\n  a            Add and focus an ad hoc shell\n  Tab / →      Focus next pane; Shift-Tab / ← goes back\n  0            Show and focus the cue list\n  c            Show/hide the cue list\n  1–9          Focus shell pane by number\n  l / h        Cycle layout / toggle header\n  x            Restart focused shell (ends its current session)\n  q            Quit and close all shells\n\nIn Cues: ↑/↓ browse, Enter sends the selected cue, e edits it.\nTab/Esc returns to a shell. Enter resumes a partially sent current cue.\nCommands are dispatched in order without waiting for completion.\n\nAlt-Left/Right rotates focus, including Cues. Ghostty mappings also accept Alt-B/F. Click a pane to focus.\nDrag a shared border to resize. Grid rows are equal height.\nScroll wheel uses scrollback; Shift-wheel overrides application mouse mode.\nAlt-click opens HTTP(S) links. Cmd-click works locally on macOS outside tmux when the host forwards the click.\nOver SSH, URL openers run on the remote host.\n\nEditor: Ctrl-L load, Ctrl-S save as, Ctrl-G apply, Esc cancel.\nLoading previews the file; applying resets queue progress. Changing a pane\nname/shell/args/cwd creates a new session. Removed sessions are closed.\nCommands are sent to the pane's current foreground program: wait for its\nprompt before running the next command. No automatic completion detection.";
 
 #[cfg(all(test, unix))]
 mod tests {

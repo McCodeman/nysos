@@ -10,7 +10,7 @@ PREFIX ?= $(HOME)/.local
 MANDIR ?= $(PREFIX)/share/man
 DESTDIR ?=
 
-.PHONY: help build release run install check test test-tmux fmt lint verify hooks \
+.PHONY: help build release run install check test test-focus test-tmux fmt lint verify hooks \
 	docs-setup docs-generate docs-check docs-build docs-serve man man-install \
 	clean docs-clean dev nix-build nix-check nix-fmt
 
@@ -52,6 +52,9 @@ check: ## Type-check all Rust targets
 
 test: ## Run unit and real PTY integration tests
 	$(CARGO) test --locked
+
+test-focus: build ## Verify Alt-arrow and Ghostty Option-arrow focus through a real PTY
+	python3 scripts/test_focus.py
 
 test-tmux: build ## Test prefixes, cues, mouse, and resize through a private tmux client
 	python3 scripts/test_tmux.py

@@ -81,7 +81,10 @@ waiting for completion. Selection advances, staying on the last cue at the end;
 Enter on the completed last cue replays it. Ctrl-G n still sends one command.
 .PP
 Without the prefix, normal input and Ctrl-C go to the focused shell.
-Alt-Left/Right rotates focus. Click to focus; drag shared borders to resize.
+Alt-Left/Right rotates focus. In the ghostty key profile Alt-B/F also rotates
+focus. Ghostty on macOS sends Alt-B/F for
+Option-Left/Right; these also become focus shortcuts instead of shell word
+navigation. Alt-Up/Down is forwarded to the shell. Click to focus; drag shared borders to resize.
 Grid row heights remain equal. Wheel events scroll history or reach applications
 requesting mouse input; Shift-wheel requests history when forwarded by the host.
 .PP
@@ -171,3 +174,13 @@ sessions across disconnects. Prefix-Tab works when Alt-arrow keys are intercepte
 URL openers run on the remote host, not the SSH client. Native macOS Command-key
 sampling is disabled over SSH and inside tmux; use client terminal link detection
 for a client-side browser. Modal editor shortcuts are independent of the prefix.
+
+.SH TERMINAL KEY PROFILES
+The --terminal-keys option and terminal_keys TOML field accept auto (default),
+standard, or ghostty. Auto detects Ghostty from TERM_PROGRAM=ghostty or, when
+TERM_PROGRAM is absent or tmux, TERM=xterm-ghostty. Other terminal identities
+use standard mappings, preserving Alt-B/F for the shell. Both profiles support
+standard Alt-Left/Right. Use an explicit profile when tmux or SSH masks the client
+terminal identity, or when terminal keybindings differ from their defaults.
+Detection uses the launch environment; reconnecting tmux does not re-detect it.
+The resolved profile appears in the help title.

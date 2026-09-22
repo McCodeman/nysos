@@ -35,7 +35,7 @@ commands = [{{pane = "shell", command = "touch {done}"}}]
         master, slave = pty.openpty()
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 30, 100, 0, 0))
         os.set_blocking(master, False)
-        command = shlex.join([str(BINARY), '--config', str(config)] + (['--prefix', 'ctrl-b'] if legacy else []))
+        command = shlex.join([str(BINARY), '--config', str(config), '--terminal-keys', 'ghostty'] + (['--prefix', 'ctrl-b'] if legacy else []))
         env = dict(os.environ, TERM='xterm-256color', SSH_TTY='/dev/test-ssh', SSH_CONNECTION='test test test test')
         env.pop('TMUX', None)
         client = subprocess.Popen(['tmux', '-S', socket, '-f', '/dev/null', 'new-session', '-s', 'test', command],
@@ -74,6 +74,12 @@ commands = [{{pane = "shell", command = "touch {done}"}}]
             tmux('set-option', '-g', 'mouse', 'on')
             send(prefix + b'0')
             wait_for(lambda: 'CUES:' in screen())
+            # Exercise terminal bytes through tmux, not just synthetic KeyEvents.
+            for right, left in [(b'\x1b[1;3C', b'\x1b[1;3D'), (b'\x1bf', b'\x1bb')]:
+                send(right)
+                wait_for(lambda: 'CUES:' not in screen())
+                send(left)
+                wait_for(lambda: 'CUES:' in screen())
             send(b'\x1b[B')
             wait_for(lambda: '2/2' in screen().splitlines()[0])
             send(b'e')
@@ -105,4 +111,4 @@ commands = [{{pane = "shell", command = "touch {done}"}}]
 
 for legacy in (False, True):
     exercise(legacy)
-    print('PASS: tmux client, SSH environment, cue navigation/edit/run, mouse, resize, quit; prefix=' + ('ctrl-b' if legacy else 'ctrl-g'))
+    print('PASS: tmux client, SSH environment, cue navigation/edit/run, Alt/Option focus, mouse, resize, quit; prefix=' + ('ctrl-b' if legacy else 'ctrl-g'))

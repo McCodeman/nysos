@@ -4,6 +4,31 @@ When a shell is focused, normal typing, Enter, Tab, Ctrl-C, arrows, and function
 shell. **Alt-Left/Right** rotates focus. On macOS, configure Option as Alt/Meta
 in your terminal if needed, or use prefix-Tab.
 
+On macOS, Ghostty's default Option-Left/Right bindings send `Esc b` / `Esc f`,
+which arrive as Alt-B/F rather than arrow events. In the Ghostty profile, nysos accepts both these
+sequences and standard Alt-Left/Right. As a result, Alt-B/F also changes focus
+instead of shell word navigation while the main view is active. Modal editors
+keep their own key handling. Only left/right arrows rotate focus; Alt-Up/Down
+are forwarded to the focused shell.
+
+The default `terminal_keys = "auto"` profile detects Ghostty from
+`TERM_PROGRAM=ghostty` (case-insensitive) or, when the program is absent/tmux,
+`TERM=xterm-ghostty`. Unknown terminals use `standard`, preserving Alt-B/F shell
+word navigation. Other named programs take precedence over TERM. The active
+profile appears in the startup status and help title.
+
+Override detection with `--terminal-keys ghostty` or `--terminal-keys standard`,
+or save `terminal_keys = "ghostty"` in the demo. CLI settings take precedence at
+startup; the full config editor can change them later. Auto detection reads the
+launch environment, not physical keybindings: custom bindings or stale tmux
+environments can require an override. Detection does not change during a tmux
+reattach; apply a profile through the editor if the client terminal changes.
+
+No Ghostty configuration change is required for its default bindings. To inspect
+custom bindings, run `ghostty +list-keybinds`; a shortcut consumed by Ghostty or
+macOS cannot reach nysos. See [Ghostty keybinding actions](https://ghostty.org/docs/config/keybind/reference).
+
+
 The default prefix is **Ctrl-G**. Override it with `--prefix` or the demo
 `prefix` field; substitute your chosen key in the controls below. See
 [tmux and SSH](tmux-ssh.md) for remote sessions and mouse forwarding.

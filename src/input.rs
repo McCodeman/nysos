@@ -1,6 +1,21 @@
 use alacritty_terminal::term::TermMode;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 
+/// Ghostty on macOS maps Option-arrows to the same bytes as Alt-B/F.
+/// Match the terminal event rather than the OS so this also works through SSH.
+pub fn focus_direction(key: KeyEvent, ghostty: bool) -> Option<isize> {
+    if key.modifiers != KeyModifiers::ALT {
+        return None;
+    }
+    match key.code {
+        KeyCode::Left => Some(-1),
+        KeyCode::Right => Some(1),
+        KeyCode::Char('b') if ghostty => Some(-1),
+        KeyCode::Char('f') if ghostty => Some(1),
+        _ => None,
+    }
+}
+
 pub fn key_bytes(key: KeyEvent, mode: TermMode) -> Vec<u8> {
     let control = key.modifiers.contains(KeyModifiers::CONTROL);
     let alt = key.modifiers.contains(KeyModifiers::ALT);
@@ -121,7 +136,41 @@ pub fn mouse_bytes(event: MouseEvent, x: u16, y: u16, mode: TermMode) -> Option<
 mod tests {
     use super::*;
     #[test]
+    fn focus_accepts_arrow_and_ghostty_word_sequences_only() {
+        for (code, direction) in [
+            (KeyCode::Left, -1),
+            (KeyCode::Right, 1),
+            (KeyCode::Char('b'), -1),
+            (KeyCode::Char('f'), 1),
+        ] {
+            assert_eq!(
+                focus_direction(KeyEvent::new(code, KeyModifiers::ALT), true),
+                Some(direction)
+            );
+            for modifiers in [
+                KeyModifiers::NONE,
+                KeyModifiers::CONTROL,
+                KeyModifiers::ALT | KeyModifiers::CONTROL,
+                KeyModifiers::ALT | KeyModifiers::SHIFT,
+            ] {
+                assert_eq!(focus_direction(KeyEvent::new(code, modifiers), true), None);
+            }
+        }
+        assert_eq!(
+            focus_direction(KeyEvent::new(KeyCode::Up, KeyModifiers::ALT), true),
+            None
+        );
+    }
+    #[test]
     fn forwards_shell_and_application_keys() {
+        assert_eq!(
+            focus_direction(KeyEvent::new(KeyCode::Char('b'), KeyModifiers::ALT), false),
+            None
+        );
+        assert_eq!(
+            focus_direction(KeyEvent::new(KeyCode::Right, KeyModifiers::ALT), false),
+            Some(1)
+        );
         assert_eq!(
             key_bytes(
                 KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL),

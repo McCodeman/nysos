@@ -14,7 +14,7 @@ jobs:
       - uses: DeterminateSystems/magic-nix-cache-action@v13
       - run: nix flake check --print-build-logs
       - run: nix develop --command make verify
-      - run: nix develop --command make test-tmux
+      - run: nix develop --command make test-focus test-tmux
   docs:
     runs-on: ubuntu-latest
     steps:

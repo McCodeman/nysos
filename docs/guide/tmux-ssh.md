@@ -51,6 +51,20 @@ Sending a literal Ctrl-B to nysos's shell then takes four Ctrl-B presses. Using
 a distinct prefix avoids this extra layer. A custom tmux prefix may need a
 different choice; nysos does not change your tmux bindings.
 
+## Terminal-specific arrow mappings
+
+Auto mode detects Ghostty from `TERM_PROGRAM` or `TERM` when that identity is
+available. tmux and SSH can hide or retain a stale identity, so for Ghostty use:
+
+```sh
+nysos --terminal-keys ghostty --config demo.toml
+```
+
+This handles Ghostty Option-arrows (`Esc b/f`) as focus commands, including over
+SSH to Linux. Use `--terminal-keys standard` to preserve Alt-B/F as shell word
+navigation. Standard Alt-arrow sequences work in both profiles. Do not change
+`TERM` just to select nysos mappings. The selected profile is shown in help.
+
 ## Run on a remote machine
 
 Install nysos on the remote host, then allocate a terminal with SSH:
@@ -85,6 +99,8 @@ sampling is disabled over SSH and inside tmux, where the client can change.
 
 `nix develop --command make test-tmux` uses an isolated tmux server and a real
 PTY client to test default and legacy prefixes, cue navigation/editing/execution,
-mouse forwarding, window resize, and clean exit. It sets SSH environment markers;
+standard Alt-arrow and Ghostty Option-arrow focus, mouse forwarding, window
+resize, and clean exit. `make test-focus` checks the same focus encodings directly
+through a PTY and verifies which shell receives subsequent input. It sets SSH environment markers;
 it does not establish a network SSH connection. The test does not alter your tmux
 configuration or sessions.

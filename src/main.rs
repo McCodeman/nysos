@@ -64,6 +64,9 @@ fn main() -> Result<()> {
     if let Some(prefix) = args.prefix {
         demo.prefix = prefix;
     }
+    if let Some(profile) = args.terminal_keys {
+        demo.terminal_keys = profile;
+    }
     demo.validate()?;
     if args.check {
         println!(

@@ -6,6 +6,7 @@ use std::{collections::HashSet, path::Path};
 #[serde(default, deny_unknown_fields)]
 pub struct Demo {
     pub prefix: crate::prefix::Prefix,
+    pub terminal_keys: crate::prefix::TerminalKeys,
     pub header: bool,
     pub cue_list: bool,
     pub cue_width: u16,
@@ -78,6 +79,7 @@ impl Default for Demo {
     fn default() -> Self {
         Self {
             prefix: crate::prefix::Prefix::default(),
+            terminal_keys: crate::prefix::TerminalKeys::Auto,
             header: true,
             cue_list: true,
             cue_width: 26,
@@ -220,6 +222,14 @@ mod tests {
     #[test]
     fn cue_sidebar_defaults_and_width_validation() {
         let demo = Demo::parse("header = false").unwrap();
+        assert_eq!(demo.terminal_keys, crate::prefix::TerminalKeys::Auto);
+        assert_eq!(
+            Demo::parse("terminal_keys = 'standard'")
+                .unwrap()
+                .terminal_keys,
+            crate::prefix::TerminalKeys::Standard
+        );
+        assert!(Demo::parse("terminal_keys = 'unknown'").is_err());
         assert_eq!(demo.prefix, crate::prefix::Prefix::CtrlG);
         assert_eq!(
             Demo::parse("prefix = 'ctrl-b'").unwrap().prefix,

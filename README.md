@@ -27,6 +27,8 @@ The left cue list supports **Up/Down**, **Enter** to run a cue, and **e** to edi
 it. **Ctrl-G, 0** focuses the list; **Ctrl-G, c** shows or hides it.
 Ctrl-G avoids tmux’s default Ctrl-B. Use `--prefix` to customize it; see
 [tmux and SSH](docs/guide/tmux-ssh.md) for remote setup and mouse forwarding.
+Ghostty Option-arrows are detected automatically; use `--terminal-keys ghostty`
+when tmux/SSH hides the terminal identity, or `standard` to preserve Alt-B/F.
 Click or use Alt-Left/Right to focus panes; drag shared borders to resize.
 
 ```sh

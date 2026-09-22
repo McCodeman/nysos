@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright 2026 Marshall Cody McCain (mccodeman@proton.me)
+// SPDX-License-Identifier: Apache-2.0
+
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, path::Path};

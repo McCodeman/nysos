@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright 2026 Marshall Cody McCain (mccodeman@proton.me)
+// SPDX-License-Identifier: Apache-2.0
+
 //! User-scoped, repeatable shell setup. Planning reads all files before mutation.
 use crate::cli::{Args, ShellTarget};
 use anyhow::{Context, Result, bail};

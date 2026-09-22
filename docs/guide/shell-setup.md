@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Copyright 2026 Marshall Cody McCain (mccodeman@proton.me) -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # PATH and shell completions
 
 Install the binary in a lasting location first, then run the setup switches.

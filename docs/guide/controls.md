@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Copyright 2026 Marshall Cody McCain (mccodeman@proton.me) -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # Controls and mouse
 
 When a shell is focused, normal typing, Enter, Tab, Ctrl-C, arrows, and function keys go to the focused

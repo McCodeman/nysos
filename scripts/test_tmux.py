@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: Copyright 2026 Marshall Cody McCain (mccodeman@proton.me)
+# SPDX-License-Identifier: Apache-2.0
+
 """Exercise nysos through a private tmux client, including its prefix key table."""
 import fcntl
 import os

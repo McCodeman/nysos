@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright 2026 Marshall Cody McCain (mccodeman@proton.me)
+// SPDX-License-Identifier: Apache-2.0
+
 /// SGR mouse reports carry Shift/Alt/Ctrl, but omit Command. For a local
 /// macOS session, sample only modifier flags when a click arrives. This does
 /// not install an event tap or read keyboard contents. Remote sessions must

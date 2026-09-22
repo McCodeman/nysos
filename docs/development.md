@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Copyright 2026 Marshall Cody McCain (mccodeman@proton.me) -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # Development and documentation
 
 Run `make` or `make help` for grouped, self-documenting targets. Each public target
@@ -269,3 +272,26 @@ system, not Sigstore. To retain a Sigstore-signed release commit, fast-forward
 let Release Please refresh its branch first. Locally created merge commits must
 also be signed. Release Please's automatically created release tags use its API
 and are not Sigstore-signed; the manually created `v0.1.0` tag is signed.
+
+## Licensing and dependency inventory
+
+First-party code and documentation use Apache-2.0. Preserve the copyright and
+SPDX headers; `make license-check` is included in `make verify` and pre-commit.
+JSON and generated lockfiles use adjacent `.license` sidecars where inline
+comments are unavailable or would be overwritten. The canonical `LICENSE` text
+is unmodified; `NOTICE` records project attribution. Nix packages include both.
+See the root contributing, security, support, and conduct documents for project
+policies.
+
+`make sbom` generates `sbom/nysos.spdx.json` with the locked `cargo-sbom` tool,
+then validates it with `spdx-tools`. `make sbom-check` verifies SPDX validity,
+normal/build dependency coverage, the lockfile digest, and package metadata.
+See `sbom/README.md` in the source checkout for scope and exclusions. SBOM checks
+run separately in CI because they require Python tooling and Cargo dependency
+metadata. Release PRs regenerate the snapshot before the bot signs its commit,
+and published releases receive a freshly generated SPDX asset.
+
+Licensing changes apply to this source revision and future releases. Previously
+published tags and the Homebrew formula pinned to an older MIT-licensed commit
+retain their original licensing; update the tap's license together with its
+source revision when packaging a new Apache-2.0 release.

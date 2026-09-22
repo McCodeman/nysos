@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright 2026 Marshall Cody McCain (mccodeman@proton.me)
+# SPDX-License-Identifier: Apache-2.0
+
 {
   description = "nysos terminal demo application and development toolchain";
 
@@ -39,6 +42,7 @@
               ./docs/reference/cli.md
               ./Makefile
               ./LICENSE
+              ./NOTICE
             ];
           };
           # Flake sources exclude .git; preserve the revision supplied by Nix.
@@ -57,10 +61,12 @@
           env.NYSOS_TEST_ZSH = "${pkgs.zsh}/bin/zsh";
           postInstall = ''
             installManPage docs/man/nysos.1
+            install -Dm644 LICENSE $out/share/doc/nysos/LICENSE
+            install -Dm644 NOTICE $out/share/doc/nysos/NOTICE
           '';
           meta = {
             description = "Multi-pane scripted and interactive terminal demonstrations";
-            license = pkgs.lib.licenses.mit;
+            license = pkgs.lib.licenses.asl20;
             mainProgram = "nysos";
             platforms = systems;
           };
@@ -98,6 +104,7 @@
               with pkgs;
               [
                 cargo
+                cargo-sbom
                 rustc
                 rustfmt
                 clippy

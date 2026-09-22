@@ -1,4 +1,14 @@
+<!-- SPDX-FileCopyrightText: Copyright 2026 Marshall Cody McCain (mccodeman@proton.me) -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # nysos
+
+[![CI](https://github.com/McCodeman/nysos/actions/workflows/ci.yml/badge.svg)](https://github.com/McCodeman/nysos/actions/workflows/ci.yml)
+[![Release Please](https://github.com/McCodeman/nysos/actions/workflows/release-please.yml/badge.svg)](https://github.com/McCodeman/nysos/actions/workflows/release-please.yml)
+[![Latest tag](https://img.shields.io/github/v/tag/McCodeman/nysos)](https://github.com/McCodeman/nysos/tags)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![SPDX SBOM](https://img.shields.io/badge/SBOM-SPDX%202.3-blue.svg)](sbom/nysos.spdx.json)
+[![Homebrew](https://img.shields.io/badge/Homebrew-mccodeman%2Ftap-orange.svg)](https://github.com/McCodeman/homebrew-tap)
 
 Multi-pane scripted and interactive CLI demonstrations in Rust, built with
 Alacritty's terminal engine, Ratatui, Crossterm, and portable-pty. Every named pane
@@ -142,3 +152,15 @@ shell on Linux. The built-in `--demo` and exported `--init` sample use `/bin/sh`
 Releases use [Release Please](docs/development.md#releases). Use Conventional
 Commits (`feat:`, `fix:`) so it can prepare version bumps and release notes;
 merging its release PR publishes the GitHub release.
+
+## Community and licensing
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) to contribute,
+[SUPPORT.md](SUPPORT.md) for help, [SECURITY.md](SECURITY.md) to report a
+vulnerability privately, and our [Code of Conduct](CODE_OF_CONDUCT.md).
+
+Copyright 2026 Marshall Cody McCain (mccodeman@proton.me).
+Licensed under [Apache-2.0](LICENSE); see [NOTICE](NOTICE). Third-party dependencies
+retain their own licenses. Earlier tagged versions retain their published licenses.
+Generate the Rust dependency [SPDX SBOM](sbom/nysos.spdx.json) with `make sbom`;
+CI also publishes a freshly generated SBOM artifact.

@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Copyright 2026 Marshall Cody McCain (mccodeman@proton.me) -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # Manual page
 
 The section 1 manual is [nysos.1](../man/nysos.1). It includes command-line options,

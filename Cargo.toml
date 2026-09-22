@@ -1,9 +1,14 @@
+# SPDX-FileCopyrightText: Copyright 2026 Marshall Cody McCain (mccodeman@proton.me)
+# SPDX-License-Identifier: Apache-2.0
+
 [package]
 name = "nysos"
 version = "0.1.0"
 edition = "2024"
 description = "Multi-pane scripted and interactive terminal demonstrations"
-license = "MIT"
+license = "Apache-2.0"
+repository = "https://github.com/McCodeman/nysos"
+homepage = "https://github.com/McCodeman/nysos"
 
 [dependencies]
 alacritty_terminal = "0.26"

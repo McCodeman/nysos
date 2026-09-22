@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright 2026 Marshall Cody McCain (mccodeman@proton.me)
+# SPDX-License-Identifier: Apache-2.0
+
 # Run: nysos --config examples/pane-transitions.toml
 # Enter in the cue list executes the selected cue. Prefix, n steps one command.
 # Each command targets a stable pane ID and may change that pane's title/scheme.

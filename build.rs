@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Copyright 2026 Marshall Cody McCain (mccodeman@proton.me)
+// SPDX-License-Identifier: Apache-2.0
+
 use std::{env, path::Path, process::Command};
 
 fn output(program: &str, args: &[&str]) -> Option<String> {

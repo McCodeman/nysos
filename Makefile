@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright 2026 Marshall Cody McCain (mccodeman@proton.me)
+# SPDX-License-Identifier: Apache-2.0
+
 .DEFAULT_GOAL := help
 
 # Override from the command line, e.g. make run ARGS='--config demo.toml'.
@@ -12,7 +15,7 @@ DESTDIR ?=
 
 .PHONY: help build release run install check test test-focus test-tmux fmt lint verify hooks \
 	docs-setup docs-generate docs-check docs-build docs-serve man man-install \
-	clean docs-clean dev nix-build nix-check nix-fmt
+	clean docs-clean dev nix-build nix-check nix-fmt license-check sbom sbom-check
 
 ##@ Help
 help: ## Show grouped targets and common overrides (default)
@@ -65,7 +68,7 @@ fmt: ## Format Rust source files
 lint: ## Run Clippy with warnings treated as errors
 	$(CARGO) clippy --locked --all-targets -- -D warnings
 
-verify: ## Check formatting, lint, tests, demo config, and generated references
+verify: license-check ## Check formatting, lint, tests, demo config, and generated references
 	$(CARGO) fmt --all -- --check
 	$(CARGO) clippy --locked --all-targets -- -D warnings
 	$(CARGO) test --locked
@@ -75,6 +78,16 @@ verify: ## Check formatting, lint, tests, demo config, and generated references
 
 hooks: ## Activate the pre-commit hook for this Git repository
 	git config core.hooksPath .githooks
+
+##@ Licensing and supply chain
+license-check: ## Check first-party copyright and SPDX source headers
+	python3 scripts/check_headers.py
+
+sbom: ## Generate and validate sbom/nysos.spdx.json from locked Cargo dependencies
+	$(UV) run --locked python scripts/sbom.py
+
+sbom-check: ## Validate the SPDX SBOM and check Cargo.lock coverage and metadata
+	$(UV) run --locked python scripts/sbom.py --check
 
 ##@ Documentation and manual
 # Python tooling stays separate from Rust verification and the pre-commit hook.

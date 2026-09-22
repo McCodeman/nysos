@@ -1,3 +1,6 @@
+<!-- SPDX-FileCopyrightText: Copyright 2026 Marshall Cody McCain (mccodeman@proton.me) -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # Demo configuration reference
 
 A demo is a UTF-8 TOML file selected with `nysos --config PATH` or loaded through

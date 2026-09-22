@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright 2026 Marshall Cody McCain (mccodeman@proton.me)
+# SPDX-License-Identifier: Apache-2.0
+
 name: Release Please
 on:
   push:
@@ -46,6 +49,8 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git config gpg.format x509
           git config gpg.x509.program gitsign
+          nix develop --command make sbom
+          git add sbom/nysos.spdx.json
           nix develop --command git commit --amend --no-edit --gpg-sign
           git push --force-with-lease="refs/heads/$RELEASE_BRANCH:$previous" origin "HEAD:refs/heads/$RELEASE_BRANCH"
       # GITHUB_TOKEN-created PRs do not trigger pull_request workflows.
@@ -57,3 +62,19 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_BRANCH: ${{ fromJSON(steps.release.outputs.pr || '{}').headBranchName }}
         run: gh workflow run ci.yml --ref "$RELEASE_BRANCH"
+      - name: Check out the published release
+        if: steps.release.outputs.release_created == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.release.outputs.tag_name }}
+      - uses: DeterminateSystems/nix-installer-action@v21
+        if: steps.release.outputs.release_created == 'true'
+      - name: Attach SPDX SBOM to the release
+        if: steps.release.outputs.release_created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag_name }}
+        run: |
+          nix develop --command make sbom
+          gh release upload "$RELEASE_TAG" sbom/nysos.spdx.json --clobber

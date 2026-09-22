@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright 2026 Marshall Cody McCain (mccodeman@proton.me)
+# SPDX-License-Identifier: Apache-2.0
+
 [project]
 site_name = "nysos"
 site_description = "User guide and reference for multi-pane CLI demonstrations"

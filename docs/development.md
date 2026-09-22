@@ -289,7 +289,10 @@ normal/build dependency coverage, the lockfile digest, and package metadata.
 See `sbom/README.md` in the source checkout for scope and exclusions. SBOM checks
 run separately in CI because they require Python tooling and Cargo dependency
 metadata. Release PRs regenerate the snapshot before the bot signs its commit,
-and published releases receive a freshly generated SPDX asset.
+and release drafts receive a freshly generated SPDX asset before publication.
+This ordering is required by GitHub immutable releases. v0.1.1 was published
+before its asset upload; its release notes link to the SBOM in the signed tag
+instead. That SBOM is also present in its source archives.
 
 Licensing changes apply to this source revision and future releases. Previously
 published tags and the Homebrew formula pinned to an older MIT-licensed commit

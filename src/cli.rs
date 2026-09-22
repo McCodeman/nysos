@@ -17,9 +17,12 @@ pub enum ShellTarget {
     about = "Multi-pane scripted and interactive terminal demonstrations",
     long_about = "Run named, interactive shell panes alongside a manually advanced command queue.\nConfigure layouts, colors, shells, and commands in a TOML demo file.\nLoading a demo never automatically executes its queued commands.",
     after_help = "Press Ctrl-G, then ? for interactive help. Use --help for examples and details.",
-    after_long_help = "EXAMPLES:\n  nysos                              Start the built-in two-pane demo\n  nysos --add-to-path                 Add this binary directory to Bash/Zsh PATH\n  nysos --install-completions         Install Bash and Zsh completions\n  nysos --init demo.toml              Write a starter file without overwriting\n  nysos --config demo.toml --check     Validate without opening shells\n  nysos --config demo.toml             Present a saved demo\n\nINTERACTIVE CONTROLS:\n  Press Ctrl-G, release, then:\n    n / Enter  Send next command       s  Skip next command\n    e          Edit current queue     o  Edit full demo: title, cues, panes\n    a          Add a live pane        Tab  Focus next pane\n    0          Focus cue list         c  Show/hide cue list\n    ?          Show all controls      q  Quit and close shell sessions\n  In the cue list: Up/Down selects, Enter sends a cue, e edits it, o edits the full demo.\n  Press p in the cue list to preview each pane’s next command; Esc closes.\n  Press t to type those commands without Enter for editing in the shells.\n  Cue commands are sent in order without waiting for completion.\n  Alt-Left/Right rotates focus; Ghostty mappings also accept Alt-B/F. Click to focus; drag dividers to resize.\n  Cmd-click opens URLs locally on macOS; Alt-click is the portable fallback.\n\nNOTES:\n  Default Ctrl-G avoids tmux Ctrl-B; --prefix selects another key.\n  Over SSH use ssh -t; URL openers run on the nysos host.\n  Interactive mode requires a terminal on both stdin and stdout.\n  Wait for the target shell prompt before sending the next command.\n  --check validates TOML and pane references, not shell availability or commands.\n  No demo file is auto-discovered. Paths are relative to the launch directory.\n  macOS is primary, Linux secondary; native Windows interaction is deferred.\n\nEXIT STATUS:\n  0  Success (including help/version)\n  1  Configuration, file, PTY, or runtime error\n  2  Invalid command-line arguments\n\nDOCUMENTATION:\n  See docs/ for user guides and the complete configuration reference.\n  Run 'man nysos' after installing the manpage with 'make man-install'."
+    after_long_help = "EXAMPLES:\n  nysos                              Start two shells with an empty cue list\n  nysos --demo                       Load the built-in six-cue demo\n  nysos --add-to-path                 Add this binary directory to Bash/Zsh PATH\n  nysos --install-completions         Install Bash and Zsh completions\n  nysos --init demo.toml              Write a starter file without overwriting\n  nysos --config demo.toml --check     Validate without opening shells\n  nysos --config demo.toml             Present a saved demo\n\nINTERACTIVE CONTROLS:\n  Press Ctrl-G, release, then:\n    n / Enter  Send next command       s  Skip next command\n    e          Edit current queue     o  Edit full demo: title, cues, panes\n    a          Add a live pane        Tab  Focus next pane\n    0          Focus cue list         c  Show/hide cue list\n    ?          Show all controls      q  Quit and close shell sessions\n  In the cue list: Up/Down selects, Enter sends a cue, e edits it, o edits the full demo.\n  Press p in the cue list to preview each pane’s next command; Esc closes.\n  Press t to type those commands without Enter for editing in the shells.\n  Cue commands are sent in order without waiting for completion.\n  Alt-Left/Right rotates focus; Ghostty mappings also accept Alt-B/F. Click to focus; drag dividers to resize.\n  Cmd-click opens URLs locally on macOS; Alt-click is the portable fallback.\n\nNOTES:\n  Default Ctrl-G avoids tmux Ctrl-B; --prefix selects another key.\n  Over SSH use ssh -t; URL openers run on the nysos host.\n  Interactive mode requires a terminal on both stdin and stdout.\n  Wait for the target shell prompt before sending the next command.\n  --check validates TOML and pane references, not shell availability or commands.\n  No demo file is auto-discovered. Paths are relative to the launch directory.\n  macOS is primary, Linux secondary; native Windows interaction is deferred.\n\nEXIT STATUS:\n  0  Success (including help/version)\n  1  Configuration, file, PTY, or runtime error\n  2  Invalid command-line arguments\n\nDOCUMENTATION:\n  See docs/ for user guides and the complete configuration reference.\n  Run 'man nysos' after installing the manpage with 'make man-install'."
 )]
 pub struct Args {
+    /// Load the built-in six-cue demo of independent pane titles and themes
+    #[arg(long, conflicts_with_all = ["config", "init", "add_to_path", "install_completions"])]
+    pub demo: bool,
     /// Show the last key event and editor mode for shortcut troubleshooting
     #[arg(long, conflicts_with_all = ["init", "check", "add_to_path", "install_completions"])]
     pub debug_keys: bool,
@@ -32,22 +35,22 @@ pub struct Args {
     /// Print full version, Git metadata, compiler, target, and build profile
     #[arg(long, action = clap::ArgAction::Version)]
     pub version_full: Option<bool>,
-    /// Load a demo TOML file instead of the built-in example
+    /// Load a demo TOML file
     #[arg(
         short,
         long,
         value_name = "PATH",
-        long_help = "Load a demo TOML file instead of the built-in example. No file is loaded automatically, including demo.toml. Relative paths resolve from the launch directory."
+        long_help = "Load a demo TOML file. No file is loaded automatically, including demo.toml. Relative paths resolve from the launch directory."
     )]
     pub config: Option<PathBuf>,
     /// Validate the selected demo without opening shells
     #[arg(
         long,
-        long_help = "Validate TOML syntax, pane count, IDs, titles, weights, and command targets without spawning shells. With no --config, checks the built-in demo. Does not verify shell paths, working directories, or command syntax."
+        long_help = "Validate TOML syntax, pane count, IDs, titles, weights, and command targets without spawning shells. Use --demo to check the built-in demo; with neither --config nor --demo, checks the empty interactive configuration. Does not verify shell paths, working directories, or command syntax."
     )]
     pub check: bool,
     /// Write a starter TOML file and exit (never overwrite)
-    #[arg(long, value_name = "PATH", conflicts_with_all = ["config", "check"], long_help = "Write a starter demo using $SHELL (or /bin/sh) and exit. The destination must not exist and its parent directory must already exist. Cannot be combined with --config or --check.")]
+    #[arg(long, value_name = "PATH", conflicts_with_all = ["config", "check"], long_help = "Write the built-in six-cue demo using /bin/sh and exit. The destination must not exist and its parent directory must already exist. Cannot be combined with --config or --check.")]
     pub init: Option<PathBuf>,
     /// Add the binary directory to shell startup files (default: all)
     #[arg(long, value_enum, num_args = 0..=1, default_missing_value = "all", value_name = "SHELL", conflicts_with_all = ["config", "check", "init"], long_help = "Add the running binary's directory to PATH for bash, zsh, or both (default: all). Updates marked blocks in user startup files, preserves other content, and backs up existing files. Use --bin-dir to select a stable installation directory. Does not copy the executable or alter the current shell.")]
@@ -63,6 +66,26 @@ pub struct Args {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn demo_is_opt_in_and_conflicts_with_other_sources() {
+        assert!(!Args::try_parse_from(["nysos"]).unwrap().demo);
+        assert!(
+            Args::try_parse_from(["nysos", "--demo", "--check"])
+                .unwrap()
+                .demo
+        );
+        for other in [
+            vec!["--config", "demo.toml"],
+            vec!["--init", "demo.toml"],
+            vec!["--add-to-path"],
+            vec!["--install-completions"],
+        ] {
+            let mut args = vec!["nysos", "--demo"];
+            args.extend(other);
+            assert!(Args::try_parse_from(args).is_err());
+        }
+    }
+
     #[test]
     fn version_switches_exit_with_build_information() {
         for flag in ["--version", "--version-full"] {

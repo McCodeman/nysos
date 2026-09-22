@@ -927,7 +927,7 @@ mod tests {
     use crate::config::Command as DemoCommand;
     use ratatui::{Terminal, backend::TestBackend};
     fn app() -> App {
-        let mut demo = Demo::default();
+        let mut demo = crate::config::test_demo();
         for pane in &mut demo.panes {
             pane.shell = crate::config::test_shell();
             pane.args = crate::config::test_shell_args();

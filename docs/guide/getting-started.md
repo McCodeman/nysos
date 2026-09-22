@@ -7,12 +7,13 @@ and uv.
 ```sh
 nix develop
 make build
-make run                           # Two shells using $SHELL, or /bin/sh
+make run                           # Two shells, empty cue list
+make run ARGS=--demo                # Built-in six-cue title/theme demonstration
 make run ARGS='--config examples/demo.toml'
 ```
 
 The example uses `/bin/zsh` for its presenter pane. On Linux, change that to an
-installed shell or generate a starter using your `$SHELL`:
+installed shell or export the built-in six-cue sample using `/bin/sh`:
 
 ```sh
 cargo run -- --init demo.toml       # Refuses to overwrite an existing file
@@ -37,3 +38,7 @@ lockfiles, and dependency updates.
 
 To make an installed binary available in new shells and enable tab completion,
 see [PATH and shell completions](shell-setup.md).
+
+Plain `nysos` never loads sample cues. Use `--demo` to select the embedded
+six-cue example or `--config PATH` to select a saved file; these flags are mutually
+exclusive. `--init PATH` exports the six-cue example using `/bin/sh`.

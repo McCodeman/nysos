@@ -51,16 +51,17 @@ fn main() -> Result<()> {
             .create_new(true)
             .open(&path)
             .context("Creating starter demo (destination must not exist)")?;
-        file.write_all(toml::to_string_pretty(&config::Demo::default())?.as_bytes())?;
+        file.write_all(toml::to_string_pretty(&config::Demo::builtin()?)?.as_bytes())?;
         println!("Created {}", path.display());
         return Ok(());
     }
-    let mut demo = args
-        .config
-        .as_ref()
-        .map(|p| config::Demo::load(p))
-        .transpose()?
-        .unwrap_or_default();
+    let mut demo = if let Some(path) = &args.config {
+        config::Demo::load(path)?
+    } else if args.demo {
+        config::Demo::builtin()?
+    } else {
+        config::Demo::default()
+    };
     if let Some(prefix) = args.prefix {
         demo.prefix = prefix;
     }

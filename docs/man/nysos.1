@@ -19,6 +19,9 @@ Loading a demo never automatically executes its queued commands.
 .el .ds Aq '
 .SH OPTIONS
 .TP
+\fB\-\-demo\fR
+Load the built\-in six\-cue demo of independent pane titles and themes
+.TP
 \fB\-\-debug\-keys\fR
 Show the last key event and editor mode for shortcut troubleshooting
 .TP
@@ -55,17 +58,17 @@ f12
 Print full version, Git metadata, compiler, target, and build profile
 .TP
 \fB\-c\fR, \fB\-\-config\fR \fI<PATH>\fR
-Load a demo TOML file instead of the built\-in example. No file is loaded
-automatically, including demo.toml. Relative paths resolve from the launch
-directory.
+Load a demo TOML file. No file is loaded automatically, including demo.toml.
+Relative paths resolve from the launch directory.
 .TP
 \fB\-\-check\fR
 Validate TOML syntax, pane count, IDs, titles, weights, and command targets
-without spawning shells. With no \-\-config, checks the built\-in demo. Does
-not verify shell paths, working directories, or command syntax.
+without spawning shells. Use \-\-demo to check the built\-in demo; with
+neither \-\-config nor \-\-demo, checks the empty interactive configuration.
+Does not verify shell paths, working directories, or command syntax.
 .TP
 \fB\-\-init\fR \fI<PATH>\fR
-Write a starter demo using $SHELL (or /bin/sh) and exit. The destination must
+Write the built\-in six\-cue demo using /bin/sh and exit. The destination must
 not exist and its parent directory must already exist. Cannot be combined with
 \-\-config or \-\-check.
 .TP
@@ -113,7 +116,10 @@ Print version
 .SH EXAMPLES
 .TP
 .B nysos
-Start the built-in two-pane demo using SHELL, or /bin/sh.
+Start two interactive shells using SHELL, or /bin/sh, with an empty cue list.
+.TP
+.B nysos --demo
+Load the built-in six-cue demo showing independent pane titles and themes.
 .TP
 .B nysos \-\-init demo.toml
 Create a starter file without overwriting an existing file.
@@ -236,7 +242,8 @@ are title (nonempty text, default "nysos demo"), prefix (ctrl-g by default),
 header (boolean, default true), cue_list (boolean, default true),
 cue_width (16 to 60 columns, default 26, capped at half the available width),
 layout (columns, rows, or grid), panes, and
-queues. Omitted panes and queues independently retain the built-in defaults.
+queues. Omitted panes use the two interactive defaults; omitted queues are
+empty.
 Use queues = [] for an interactive-only demo with custom panes.
 .PP
 Each pane table has id (unique identity), optional title (display label),
@@ -269,8 +276,8 @@ not executable paths, directories, command syntax, or service availability.
 .SH ENVIRONMENT
 .TP
 .B SHELL
-Default shell executable for panes that omit shell and for generated starter
-files.
+Default shell executable for panes that omit shell. The built-in and exported
+six-cue example explicitly uses /bin/sh.
 Falls back to /bin/sh when unavailable.
 .TP
 .B TERM, COLORTERM
@@ -286,7 +293,8 @@ working directory.
 .SH FILES
 .TP
 .B demo.toml
-Initial save-path suggestion for the built-in demo. Not loaded automatically.
+Initial save-path suggestion when no configuration file is selected. Not
+loaded automatically.
 .TP
 .B docs/reference/configuration.md
 Complete configuration reference in the source distribution.

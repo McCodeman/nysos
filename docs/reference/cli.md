@@ -10,6 +10,9 @@ Loading a demo never automatically executes its queued commands.
 Usage: nysos [OPTIONS]
 
 Options:
+      --demo
+          Load the built-in six-cue demo of independent pane titles and themes
+
       --debug-keys
           Show the last key event and editor mode for shortcut troubleshooting
 
@@ -27,17 +30,17 @@ Options:
           Print full version, Git metadata, compiler, target, and build profile
 
   -c, --config <PATH>
-          Load a demo TOML file instead of the built-in example. No file is loaded
-          automatically, including demo.toml. Relative paths resolve from the launch
-          directory.
+          Load a demo TOML file. No file is loaded automatically, including demo.toml.
+          Relative paths resolve from the launch directory.
 
       --check
           Validate TOML syntax, pane count, IDs, titles, weights, and command targets
-          without spawning shells. With no --config, checks the built-in demo. Does not
+          without spawning shells. Use --demo to check the built-in demo; with neither
+          --config nor --demo, checks the empty interactive configuration. Does not
           verify shell paths, working directories, or command syntax.
 
       --init <PATH>
-          Write a starter demo using $SHELL (or /bin/sh) and exit. The destination must
+          Write the built-in six-cue demo using /bin/sh and exit. The destination must
           not exist and its parent directory must already exist. Cannot be combined with
           --config or --check.
 
@@ -67,7 +70,8 @@ Options:
           Print version
 
 EXAMPLES:
-  nysos                              Start the built-in two-pane demo
+  nysos                              Start two shells with an empty cue list
+  nysos --demo                       Load the built-in six-cue demo
   nysos --add-to-path                 Add this binary directory to Bash/Zsh PATH
   nysos --install-completions         Install Bash and Zsh completions
   nysos --init demo.toml              Write a starter file without overwriting

@@ -126,27 +126,17 @@ impl Default for Demo {
                     ..Default::default()
                 },
             ],
-            queues: vec![Queue {
-                name: "Welcome".into(),
-                description: "Edit, run or skip these commands; every pane is a live shell.".into(),
-                commands: vec![
-                    Command {
-                        pane: "presenter".into(),
-                        command: "printf 'Welcome to nysos!\\n'".into(),
-                        ..Default::default()
-                    },
-                    Command {
-                        pane: "observer".into(),
-                        command: "pwd".into(),
-                        ..Default::default()
-                    },
-                ],
-            }],
+            queues: vec![],
         }
     }
 }
 
 impl Demo {
+    /// Explicitly selected sample, embedded so installation needs no example files.
+    pub fn builtin() -> Result<Self> {
+        Self::parse(include_str!("../examples/pane-transitions.toml"))
+    }
+
     pub fn parse(text: &str) -> Result<Self> {
         let demo: Self = toml::from_str(text).context("Invalid demo TOML")?;
         demo.validate()?;
@@ -266,8 +256,56 @@ pub fn test_shell_args() -> Vec<String> {
 }
 
 #[cfg(test)]
+pub fn test_demo() -> Demo {
+    Demo {
+        queues: vec![Queue {
+            name: "Welcome".into(),
+            description: "Edit, run or skip these commands; every pane is a live shell.".into(),
+            commands: vec![
+                Command {
+                    pane: "presenter".into(),
+                    command: "printf 'Welcome to nysos!\\n'".into(),
+                    ..Default::default()
+                },
+                Command {
+                    pane: "observer".into(),
+                    command: "pwd".into(),
+                    ..Default::default()
+                },
+            ],
+        }],
+        ..Demo::default()
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn sample_is_explicit_and_defaults_have_no_cues() {
+        assert!(Demo::default().queues.is_empty());
+        assert!(Demo::parse("").unwrap().queues.is_empty());
+        assert!(
+            Demo::parse("[[panes]]\nid = 'custom'")
+                .unwrap()
+                .queues
+                .is_empty()
+        );
+        let demo = Demo::builtin().unwrap();
+        assert_eq!(demo.queues.len(), 6);
+        assert_eq!(demo.panes.len(), 2);
+        assert_eq!(demo.queues[1].commands.len(), 1);
+        assert_eq!(demo.queues[2].commands.len(), 1);
+        assert_ne!(
+            demo.queues[1].commands[0].pane,
+            demo.queues[2].commands[0].pane
+        );
+        for index in [1, 2] {
+            assert!(demo.queues[index].commands[0].title.is_some());
+            assert!(demo.queues[index].commands[0].scheme.is_some());
+        }
+    }
+
     #[test]
     fn pane_ids_titles_and_legacy_names_round_trip() {
         let demo = Demo::parse(
@@ -289,14 +327,14 @@ title = "Display name"
         assert_eq!(Demo::parse(&text).unwrap().panes[1].id, "stable");
         assert!(Demo::parse("queues = []\n[[panes]]\nid = 'a'\nname = 'b'").is_err());
         for title in ["", " ", "bad\nline", "bad\u{1b}title"] {
-            let mut invalid = Demo::default();
+            let mut invalid = test_demo();
             invalid.panes[0].title = Some(title.into());
             assert!(invalid.validate().is_err());
             invalid.panes[0].title = None;
             invalid.queues[0].commands[0].title = Some(title.into());
             assert!(invalid.validate().is_err());
         }
-        let mut demo = Demo::default();
+        let mut demo = test_demo();
         demo.panes[0].title = Some("Shared title".into());
         demo.panes[1].title = demo.panes[0].title.clone();
         demo.queues[0].commands[0].title = Some("New title".into());
@@ -310,7 +348,7 @@ title = "Display name"
     }
     #[test]
     fn each_cue_allows_only_one_command_per_pane() {
-        let mut demo = Demo::default();
+        let mut demo = test_demo();
         demo.queues.push(demo.queues[0].clone());
         assert!(demo.validate().is_ok()); // Different cues may reuse panes.
         let duplicate = demo.queues[0].commands[0].clone();
@@ -359,7 +397,7 @@ title = "Display name"
     fn round_trip_and_atomic_save() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("demo.toml");
-        let mut demo = Demo::default();
+        let mut demo = test_demo();
         demo.save(&path).unwrap();
         demo.header = false;
         demo.save(&path).unwrap();
@@ -369,19 +407,19 @@ title = "Display name"
     }
     #[test]
     fn rejects_invalid_targets_and_duplicate_names() {
-        let mut demo = Demo::default();
+        let mut demo = test_demo();
         demo.queues[0].commands[0].pane = "missing".into();
         assert!(demo.validate().is_err());
-        demo = Demo::default();
+        demo = test_demo();
         demo.panes[1].id = demo.panes[0].id.clone();
         assert!(demo.validate().is_err());
     }
     #[test]
     fn rejects_empty_and_multiline_commands() {
-        let mut demo = Demo::default();
+        let mut demo = test_demo();
         demo.panes.clear();
         assert!(demo.validate().is_err());
-        demo = Demo::default();
+        demo = test_demo();
         demo.queues[0].commands[0].command = "echo a\necho b".into();
         assert!(demo.validate().is_err());
     }

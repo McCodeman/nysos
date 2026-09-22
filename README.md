@@ -13,6 +13,10 @@ Use `nysos --version` or `--version-full` for build and Git information;
 
 ## Quick start
 
+Plain `nysos` opens two interactive shells with an empty cue list. Use
+`nysos --demo` to load the built-in six-cue example of changing pane titles and
+themes. `nysos --init demo.toml` exports that example for editing.
+
 Install with Homebrew on macOS or Linux:
 
 ```sh
@@ -133,4 +137,4 @@ Use `nix build` for the packaged release binary and manpage in `result/`, or
 See [development documentation](docs/development.md) for build targets, generated
 CLI/manpage updates, CI, and the code map. The annotated
 [example demo](examples/demo.toml) uses `/bin/zsh`; change that to an installed
-shell on Linux, or use `--init` to generate a demo using `$SHELL`.
+shell on Linux. The built-in `--demo` and exported `--init` sample use `/bin/sh`.

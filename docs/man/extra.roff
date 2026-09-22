@@ -1,7 +1,10 @@
 .SH EXAMPLES
 .TP
 .B nysos
-Start the built-in two-pane demo using SHELL, or /bin/sh.
+Start two interactive shells using SHELL, or /bin/sh, with an empty cue list.
+.TP
+.B nysos --demo
+Load the built-in six-cue demo showing independent pane titles and themes.
 .TP
 .B nysos \-\-init demo.toml
 Create a starter file without overwriting an existing file.
@@ -104,7 +107,7 @@ Demo files use TOML. No file is automatically discovered. The top-level fields
 are title (nonempty text, default "nysos demo"), prefix (ctrl-g by default), header (boolean, default true), cue_list (boolean, default true),
 cue_width (16 to 60 columns, default 26, capped at half the available width),
 layout (columns, rows, or grid), panes, and
-queues. Omitted panes and queues independently retain the built-in defaults.
+queues. Omitted panes use the two interactive defaults; omitted queues are empty.
 Use queues = [] for an interactive-only demo with custom panes.
 .PP
 Each pane table has id (unique identity), optional title (display label), shell, args, optional cwd,
@@ -129,7 +132,8 @@ not executable paths, directories, command syntax, or service availability.
 .SH ENVIRONMENT
 .TP
 .B SHELL
-Default shell executable for panes that omit shell and for generated starter files.
+Default shell executable for panes that omit shell. The built-in and exported
+six-cue example explicitly uses /bin/sh.
 Falls back to /bin/sh when unavailable.
 .TP
 .B TERM, COLORTERM
@@ -145,7 +149,7 @@ working directory.
 .SH FILES
 .TP
 .B demo.toml
-Initial save-path suggestion for the built-in demo. Not loaded automatically.
+Initial save-path suggestion when no configuration file is selected. Not loaded automatically.
 .TP
 .B docs/reference/configuration.md
 Complete configuration reference in the source distribution.

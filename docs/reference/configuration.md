@@ -1,7 +1,8 @@
 # Demo configuration reference
 
 A demo is a UTF-8 TOML file selected with `nysos --config PATH` or loaded through
-the modal. There is no automatic discovery of `demo.toml`. Unknown fields and
+the modal. Plain `nysos` starts two interactive panes with no cues; `nysos --demo`
+explicitly loads the built-in six-cue example. There is no automatic discovery of `demo.toml`. Unknown fields and
 invalid enum values are rejected. All paths resolve relative to nysos's launch
 directory, not the configuration file's directory; `~` and environment variables
 inside configured paths are not expanded.
@@ -86,18 +87,18 @@ commands = [
 | `cue_width` | Integer | `26` | Sidebar width including borders, 16–60 columns; capped at half the content width in small terminals. |
 | `layout` | String enum | `"columns"` | `"columns"`, `"rows"`, or `"grid"`. |
 | `panes` | Array of pane tables | Built-in `presenter` and `observer` panes | Between 1 and 16 pane definitions; their count determines pane count. |
-| `queues` | Array of queue tables | Built-in `Welcome` item | Ordered queue items; an empty array is allowed. |
+| `queues` | Array of queue tables | `[]` | Ordered queue items; an empty array is allowed. |
 
-Defaults apply independently: omitting `queues` retains the built-in commands
-for `presenter` and `observer`. If you define other pane IDs, explicitly supply
-`queues` or set `queues = []`. Otherwise validation may report an unknown target.
-An empty TOML file describes the built-in demo; `panes = []` is invalid.
+Omitting `queues` gives an empty cue list, including when defining custom panes.
+An empty TOML file describes two interactive shells with no cues; `panes = []`
+is invalid. No sample commands are inserted into files that omit `queues`.
 
 The omitted `panes` array creates `presenter` (ocean) and `observer` (ember),
-each with weight 1 and the normal shell/args/cwd defaults. The omitted `queues`
-array creates one `Welcome` cue with two commands: `printf 'Welcome to nysos!\n'`
-in `presenter`, then `pwd` in `observer`. Generate the current full defaults with
-`nysos --init demo.toml`; it refuses to overwrite an existing file.
+each with weight 1 and the normal shell/args/cwd defaults.
+`nysos --demo` explicitly loads the six-cue pane transitions example, using
+`service` and `observer` panes with `/bin/sh`. It demonstrates independent pane
+updates, updates to both panes, title-only overrides, and theme-only overrides.
+`nysos --init demo.toml` exports this example; it refuses to overwrite a file.
 
 For a purely interactive single-pane demo:
 

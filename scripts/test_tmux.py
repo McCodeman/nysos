@@ -60,7 +60,9 @@ commands = [{{pane = "shell", command = "printf BOOKMARK_ANCHOR; touch {done}"}}
                 try:
                     if predicate():
                         return
-                except subprocess.CalledProcessError:
+                except (subprocess.CalledProcessError, IndexError):
+                    # capture-pane can contain short rows until nysos finishes
+                    # redrawing after a terminal resize.
                     pass
                 time.sleep(0.03)
             raise AssertionError('tmux smoke test timed out')

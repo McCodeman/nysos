@@ -18,7 +18,7 @@ external services are ready. Run the demo once to rehearse those details.
 
 A demo is an ordered list of queue items. Each item contains one or more commands,
 and each command names its target pane. The header shows the item index, name,
-description, command index, and next command. Toggle it with **prefix, h**.
+description, and command index. Toggle it with **prefix, h**.
 
 Press **Ctrl-G**, release it, then:
 
@@ -41,7 +41,10 @@ sending another shell command. Ctrl-C goes to the focused pane.
 
 The left cue list lets you jump directly to an item. Click it or press
 **Ctrl-G, 0**, browse with **Up/Down**, and press **e** to edit the selection.
-**Enter** dispatches its commands in order without waiting for completion, then
+**p** previews the next command for each pane in a small overlay; **Esc** closes
+the previews without running anything. **t** types the next command per target
+pane without Enter so you can edit it directly in the shell. Typing leaves
+playback progress unchanged; see [controls](controls.md#type-and-edit-in-the-shells). **Enter** dispatches its commands in order without waiting for completion, then
 selects the next cue. It resumes remaining commands for the current playback
 item; choosing an earlier item replays it. Browsing alone changes no progress.
 Use **Ctrl-G, c** to show/hide the list and **Esc** to return to your shell.

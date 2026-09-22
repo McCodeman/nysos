@@ -195,6 +195,17 @@ Show help or quit, respectively. Esc closes help.
 .PP
 In the cue list, Up/Down selects, Enter sends the selected cue, and e edits
 it.
+Plain p previews the selected cue\(aqs next pending command over each pane.
+Panes without pending commands say so. Up/Down scrolls long preview text; Esc
+closes all previews. Previewing executes nothing and leaves progress
+unchanged.
+Plain t types the first remaining command per target pane without sending
+Enter,
+then focuses the first target pane. Edit and submit each line in its shell.
+Start
+at empty shell prompts; input is inserted at the cursor. Control characters
+(including tabs) are rejected. Progress is unchanged; skip manually submitted
+commands or select a later cue to avoid sending them again.
 Plain o opens the full demo editor to add cues or edit the demo title.
 Home/End and Page Up/Down browse; the wheel scrolls the list. Click selects
 without executing. Esc returns to the previous shell. Enter resumes the
@@ -235,7 +246,9 @@ panes. The shell defaults to SHELL or /bin/sh; args defaults to an empty
 array;
 name defaults to shell; scheme defaults to ocean; weight defaults to 1.
 .PP
-Each queue table requires a nonempty name and one or more commands, with an
+Each queue table requires a nonempty name and one or more commands, with at
+most one command per pane within that queue. Repeated targets are rejected.
+The same pane may be used in another queue. Each queue has an
 optional description. Each command requires pane (an existing pane name) and
 command (nonempty single-line input, with no NUL, CR, or LF).
 .PP

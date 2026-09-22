@@ -79,7 +79,7 @@ commands = [
 | `title` | String | `"nysos demo"` | Nonempty demo title displayed above cue details when the header is enabled; control characters are rejected. |
 | `terminal_keys` | String enum | `"auto"` | `"auto"` detects Ghostty using TERM_PROGRAM/TERM; `"ghostty"` adds Alt-B/F focus aliases; `"standard"` preserves those shell keys. `--terminal-keys` overrides at startup. |
 | `prefix` | String enum | `"ctrl-g"` | Control prefix: `"ctrl-g"`, `"ctrl-a"`, `"ctrl-b"`, or `"f12"`. `--prefix` overrides it at startup. |
-| `header` | Boolean | `true` | Show the demo title, cue index/name/description, command index, and next command above the panes. When the cue list is focused, preview its selection. |
+| `header` | Boolean | `true` | Show the demo title, cue index/name/description, and command index above the panes. When the cue list is focused, show its selection. |
 | `cue_list` | Boolean | `true` | Show the left cue sidebar; toggle with Ctrl-G, c. |
 | `cue_width` | Integer | `26` | Sidebar width including borders, 16–60 columns; capped at half the content width in small terminals. |
 | `layout` | String enum | `"columns"` | `"columns"`, `"rows"`, or `"grid"`. |
@@ -201,13 +201,15 @@ are rendered separately. Custom RGB theme definitions are not supported yet.
 | --- | --- | --- | --- |
 | `name` | String | Required | Label in the cue list and header; cannot be empty or whitespace-only. Cue names need not be unique. |
 | `description` | String | `""` | Free-form presenter-facing text in the header; empty or multiline text is accepted, but the fixed-height header can clip long text. |
-| `commands` | Array of command tables | Required | One or more commands, sent in listed order. |
+| `commands` | Array of command tables | Required | One or more commands, sent in listed order; each pane may appear at most once per cue. |
 
 Ctrl-G, n sends a single command. Enter in the cue sidebar sends all remaining
 commands of the selected item in order, without waiting for completion. Commands
 can target different panes within the same item. Skipping advances
 past one command; finishing the last command advances to the next queue item.
-There is no configured limit on the number of cues or commands per cue.
+There is no configured limit on the number of cues. Each cue has at most one
+command per configured pane, so its command count cannot exceed the pane count.
+The same pane may be targeted again in another cue.
 `queues = []` is valid; `commands = []` within a cue is invalid. Shell commands
 are sent with Enter to the target pane's current foreground program, not always
 to a fresh shell. Do not assume completion before sending the next command.
@@ -247,16 +249,20 @@ title = "Nested command example"
 name = "shell"
 shell = "/bin/sh"
 
+[[panes]]
+name = "files"
+shell = "/bin/sh"
+
 [[queues]]
 name = "Inspect"
-description = "Both commands target the same existing shell."
+description = "One command for each of two independent shells."
 
 [[queues.commands]]
 pane = "shell"
 command = "pwd"
 
 [[queues.commands]]
-pane = "shell"
+pane = "files"
 command = "ls -lah"
 
 [[queues]]
@@ -277,7 +283,7 @@ nysos --config demo.toml --check
 Validation rejects malformed TOML, wrong value types, unknown fields/enum values,
 blank titles or titles containing control characters, cue widths outside 16–60,
 zero or more than 16 panes, duplicate or blank pane names, empty shells, weights
-outside 1–1000, missing/blank cue names, missing/empty command lists, unknown
+outside 1–1000, missing/blank cue names, missing/empty command lists, repeated pane targets within a cue, unknown
 command targets, and blank commands or commands containing NUL/CR/LF. Integer
 bounds are inclusive. A disabled sidebar still requires a valid `cue_width`.
 

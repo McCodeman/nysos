@@ -83,6 +83,8 @@ INTERACTIVE CONTROLS:
     ?          Show all controls      q  Quit and close shell sessions
   In the cue list: Up/Down selects, Enter sends a cue, e edits it, o edits the full
   demo.
+  Press p in the cue list to preview each pane’s next command; Esc closes.
+  Press t to type those commands without Enter for editing in the shells.
   Cue commands are sent in order without waiting for completion.
   Alt-Left/Right rotates focus; Ghostty mappings also accept Alt-B/F. Click to focus;
   drag dividers to resize.

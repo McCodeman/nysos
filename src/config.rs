@@ -188,7 +188,15 @@ impl Queue {
         if self.name.trim().is_empty() || self.commands.is_empty() {
             bail!("Each queue needs a name and at least one command");
         }
+        let mut targets = HashSet::new();
         for command in &self.commands {
+            if !targets.insert(command.pane.as_str()) {
+                bail!(
+                    "Cue '{}' has more than one command for pane '{}'; each cue allows at most one command per pane",
+                    self.name,
+                    command.pane
+                );
+            }
             if !panes.contains(command.pane.as_str()) {
                 bail!("Unknown pane: {}", command.pane);
             }
@@ -224,6 +232,25 @@ pub fn test_shell_args() -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn each_cue_allows_only_one_command_per_pane() {
+        let mut demo = Demo::default();
+        demo.queues.push(demo.queues[0].clone());
+        assert!(demo.validate().is_ok()); // Different cues may reuse panes.
+        let duplicate = demo.queues[0].commands[0].clone();
+        demo.queues[0].commands.push(duplicate);
+        let text = toml::to_string(&demo).unwrap();
+        let error = Demo::parse(&text).unwrap_err().to_string();
+        assert!(error.contains("Welcome"));
+        assert!(error.contains("presenter"));
+        assert!(error.contains("at most one command per pane"));
+        let targets = demo.panes.iter().map(|p| p.name.as_str()).collect();
+        assert!(demo.queues[0].validate(&targets).is_err());
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("invalid.toml");
+        assert!(demo.save(&path).is_err());
+        assert!(!path.exists());
+    }
     #[test]
     fn cue_sidebar_defaults_and_width_validation() {
         let demo = Demo::parse("header = false").unwrap();

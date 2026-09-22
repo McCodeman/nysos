@@ -74,6 +74,8 @@ press **Ctrl-G, 0**. While focused:
 | Home / End | Select the first / last cue |
 | Page Up / Page Down | Browse a page at a time |
 | Enter | Send all remaining commands in the selected cue |
+| `p` | Preview the selected cue’s next command over each shell pane; Esc closes |
+| `t` | Type the next command per target pane without Enter, then focus the first target |
 | `e` | Edit only the selected cue in the modal |
 | `o` | Open the entire demo to add cues, rename the demo, or load/save a file |
 | Tab / Shift-Tab | Cycle focus to a shell |
@@ -90,6 +92,38 @@ After dispatch, selection advances to the next cue, or stays on the last cue.
 Pressing Enter again on the last completed cue replays it. Commands are sent
 in order without waiting for completion. Use **Ctrl-G, n** for one command at a
 time when you need to wait between commands.
+
+### Preview before executing
+
+Select a cue and press **p**. A small dialog over each shell pane shows its first
+remaining command from that cue and the number of pending commands for that pane.
+Panes without a remaining command show “No pending command for this cue.” For the
+current partially executed cue, the preview skips commands already sent or skipped;
+other cues preview from their beginning, matching replay behavior.
+
+**Up/Down** scrolls long command text in the preview dialogs. **Esc** dismisses
+all dialogs and returns to the selected cue. Previews do not execute commands,
+change playback progress, or send keyboard/paste/mouse input to the shells.
+The shell processes continue running behind the dialogs. Close the preview before
+pressing Enter to run the cue. With an empty cue list, `p` does nothing.
+
+### Type and edit in the shells
+
+With a cue selected, press **t**. nysos types the same next command shown by
+preview into each target pane, without sending Enter, and focuses the first target
+in pane order. Click another pane or rotate focus to edit its prepared line.
+Press Enter in each shell when ready. A cue may target each pane only once;
+`t` types that command if it has not already been sent or skipped.
+
+Start with each target at an empty shell prompt. Typing inserts at its current
+cursor; it does not clear existing input or interrupt a foreground program.
+Commands containing control characters (including tabs) cannot be typed this way.
+Pressing `t` again inserts the text again. Preview must be closed before using `t`.
+
+Typing leaves cue progress unchanged because nysos cannot detect manual execution.
+After submitting the edited lines, use prefix-s to skip those commands in playback,
+or select a later cue. Avoid running the same cue through the queue until pending
+shell input is submitted or cleared; Enter in the queue sends commands again.
 
 ## Links on macOS
 

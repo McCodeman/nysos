@@ -74,13 +74,13 @@ commands = [{{pane = "shell", command = "touch {done}"}}]
             wait_for(lambda: 'First cue' in screen())
             tmux('set-option', '-g', 'mouse', 'on')
             send(prefix + b'0')
-            wait_for(lambda: 'o edit demo/add cues' in screen())
+            wait_for(lambda: 'CUES:' in screen())
             # Exercise terminal bytes through tmux, not just synthetic KeyEvents.
             for right, left in [(b'\x1b[1;3C', b'\x1b[1;3D'), (b'\x1bf', b'\x1bb')]:
                 send(right)
-                wait_for(lambda: 'o edit demo/add cues' not in screen())
+                wait_for(lambda: 'CUES:' not in screen())
                 send(left)
-                wait_for(lambda: 'o edit demo/add cues' in screen())
+                wait_for(lambda: 'CUES:' in screen())
             # Full-editor actions are direct chords, not prefix sequences.
             for load, save, apply in [(b'\x0c', b'\x13', b'\x07'), (b'\x1bOQ', b'\x1bOR', b'\x1bOS')]:
                 send(b'o')
@@ -100,6 +100,20 @@ commands = [{{pane = "shell", command = "touch {done}"}}]
                 assert 'title = "nysos demo"' in config.read_text()
             send(b'\x1b[B')
             wait_for(lambda: '2/2' in screen().splitlines()[1])
+            send(b'p')
+            wait_for(lambda: ' Preview ' in screen())
+            assert not done.exists()
+            send(b'\x1b')
+            wait_for(lambda: ' Preview ' not in screen())
+            send(b't')
+            wait_for(lambda: 'Typed without Enter' in screen())
+            assert not done.exists()
+            edited = root / 'edited'
+            send(b'\x15' + f'touch {edited}\r'.encode())
+            wait_for(edited.exists)
+            assert not done.exists()
+            send(prefix + b'0')
+            wait_for(lambda: 'CUES:' in screen())
             send(b'e')
             wait_for(lambda: 'Single cue TOML' in screen())
             send(b'\x1b')

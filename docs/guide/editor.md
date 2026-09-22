@@ -58,12 +58,12 @@ Use the full demo editor to save edited cues, sidebar visibility, and width.
    description = "Show the current directory and files."
    commands = [
      { pane = "presenter", command = "pwd" },
-     { pane = "presenter", command = "ls -lah" },
+     { pane = "observer", command = "ls -lah" },
    ]
    ```
 
    Use an existing pane name in each command. Each cue needs at least one
-   command. To remove a cue, remove its whole `[[queues]]` block.
+   command and may target each pane only once. To remove a cue, remove its whole `[[queues]]` block.
 5. Press **Ctrl-S** (or **F3**), choose a save path, and press **Enter** to save
    and apply. **Ctrl-G** (or **F4**) applies without saving. **Esc** cancels.
 

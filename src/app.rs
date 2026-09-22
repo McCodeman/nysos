@@ -59,6 +59,8 @@ pub struct App {
     editor: Option<Editor>,
     pending_demo: Option<Demo>,
     help: bool,
+    preview: bool,
+    preview_scroll: u16,
     pub quit: bool,
     pub debug_keys: bool,
     last_key: String,
@@ -93,6 +95,8 @@ impl App {
             editor: None,
             pending_demo: None,
             help: false,
+            preview: false,
+            preview_scroll: 0,
             quit: false,
             debug_keys: false,
             last_key: "Waiting for a key".into(),
@@ -154,20 +158,14 @@ impl App {
                 0
             };
             let text = if let Some(queue) = self.demo.queues.get(queue_index) {
-                let target = queue
-                    .commands
-                    .get(command_index)
-                    .map(|c| format!("{} → {}", c.pane, c.command))
-                    .unwrap_or_default();
                 format!(
-                    "{}/{} · {} · command {}/{}\n{}\n{}",
+                    "{}/{} · {} · command {}/{}\n{}",
                     queue_index + 1,
                     self.demo.queues.len(),
                     queue.name,
                     command_index + 1,
                     queue.commands.len(),
-                    queue.description,
-                    target
+                    queue.description
                 )
             } else {
                 "Demo complete · prefix o to edit or load another demo".into()
@@ -210,8 +208,10 @@ impl App {
         } else {
             &self.status
         };
-        let hints = if self.cues.focused {
-            "↑↓ select · Enter run · e edit cue · o edit demo/add cues · Ctrl-G c hide"
+        let hints = if self.preview {
+            "PREVIEW: ↑↓ scroll · Esc close · no commands executed"
+        } else if self.cues.focused {
+            "CUES: ↑↓ select · Enter run · p preview · t type · e edit · o demo/add cues"
         } else {
             "Ctrl-G: controls   Alt-←/→: focus   Click: focus   Drag border: resize   Alt-click: URL"
         };
@@ -223,7 +223,38 @@ impl App {
             .style(Style::default().fg(Color::Gray)),
             chunks[2],
         );
-        if let Some(editor) = &self.editor {
+        if self.preview {
+            for (pane, rect) in self.panes.iter().zip(&self.rects) {
+                let body = inner(*rect);
+                let width = body.width.min(68);
+                let height = body.height.min(8);
+                let area = Rect::new(
+                    body.x + (body.width - width) / 2,
+                    body.y + (body.height - height) / 2,
+                    width,
+                    height,
+                );
+                let (next, count) = self.pane_preview(&pane.config.name);
+                let title = format!(" Preview · {} · {} pending ", pane.config.name, count);
+                let text = next.unwrap_or("No pending command for this cue");
+                frame.render_widget(Clear, area);
+                frame.render_widget(
+                    Paragraph::new(text)
+                        .block(Block::bordered().title(title))
+                        .style(Style::default().fg(Color::White).bg(Color::Rgb(28, 35, 48)))
+                        .wrap(Wrap { trim: false })
+                        .scroll((
+                            if next.is_some() {
+                                self.preview_scroll
+                            } else {
+                                0
+                            },
+                            0,
+                        )),
+                    area,
+                );
+            }
+        } else if let Some(editor) = &self.editor {
             let area = popup(area, 92, 88);
             frame.render_widget(Clear, area);
             let title = match editor.kind {
@@ -290,6 +321,7 @@ impl App {
                 Some(EditorKind::LoadPath) => "load path",
                 Some(EditorKind::SavePath) => "save path",
                 None if self.help => "help",
+                None if self.preview => "cue preview",
                 None if self.cues.focused => "cue list",
                 None => "shell",
             };
@@ -333,6 +365,17 @@ impl App {
         }
         if self.editor.is_some() {
             return self.editor_event(event);
+        }
+        if self.preview {
+            if let Event::Key(key) = event {
+                match key.code {
+                    KeyCode::Esc => self.preview = false,
+                    KeyCode::Up => self.preview_scroll = self.preview_scroll.saturating_sub(1),
+                    KeyCode::Down => self.preview_scroll = self.preview_scroll.saturating_add(1),
+                    _ => {}
+                }
+            }
+            return Ok(());
         }
         if self.help {
             if matches!(
@@ -445,6 +488,61 @@ impl App {
         ));
         Ok(())
     }
+    fn pane_preview(&self, pane: &str) -> (Option<&str>, usize) {
+        let Some(cue) = self.demo.queues.get(self.cues.selected) else {
+            return (None, 0);
+        };
+        let start = if self.cues.selected == self.queue {
+            self.command
+        } else {
+            0
+        };
+        let mut commands = cue
+            .commands
+            .iter()
+            .skip(start)
+            .filter(|command| command.pane == pane);
+        let next = commands.next().map(|command| command.command.as_str());
+        let count = usize::from(next.is_some()) + commands.count();
+        (next, count)
+    }
+    fn type_selected(&mut self) -> Result<()> {
+        let commands: Vec<_> = self
+            .panes
+            .iter()
+            .enumerate()
+            .filter_map(|(index, pane)| {
+                self.pane_preview(&pane.config.name)
+                    .0
+                    .map(|command| (index, command.to_owned()))
+            })
+            .collect();
+        let Some((first, _)) = commands.first() else {
+            self.status = "No pending commands to type for this cue".into();
+            return Ok(());
+        };
+        // Preflight every destination before modifying any pane's input buffer.
+        for (index, command) in &commands {
+            if command.chars().any(char::is_control) {
+                bail!("Typing requires commands without control characters (including tabs)");
+            }
+            let pane = &mut self.panes[*index];
+            pane.pump()?;
+            if pane.exited {
+                bail!(
+                    "Pane '{}' has exited; restart it before typing this cue",
+                    pane.config.name
+                );
+            }
+        }
+        for (index, command) in &commands {
+            self.panes[*index].paste(command)?;
+        }
+        self.active = *first;
+        self.cues.focused = false;
+        self.status = "Typed without Enter · edit in each shell · cue progress unchanged".into();
+        Ok(())
+    }
     fn edit_queue(&mut self, index: usize) -> Result<()> {
         if let Some(queue) = self.demo.queues.get(index) {
             self.editor = Some(Editor::new(
@@ -476,6 +574,11 @@ impl App {
                 count,
             ),
             KeyCode::Enter => self.execute_selected()?,
+            KeyCode::Char('t') => self.type_selected()?,
+            KeyCode::Char('p') if count > 0 => {
+                self.preview = true;
+                self.preview_scroll = 0;
+            }
             KeyCode::Char('e') => self.edit_queue(self.cues.selected)?,
             KeyCode::Char('o') => self.edit_demo()?,
             KeyCode::Tab | KeyCode::Right => self.rotate(1),
@@ -811,7 +914,7 @@ fn open_url(url: &str) -> Result<()> {
     });
     Ok(())
 }
-const HELP: &str = "Every pane is a live PTY shell. Type normally; Ctrl-C reaches the shell.\n\nPress Ctrl-G, release, then:\n  n / Enter    Send the next command and advance\n  s            Skip the next command\n  e            Edit current queue item before running it\n  o            Edit full demo (title, add/reorder cues, panes, layout)\n  a            Add and focus an ad hoc shell\n  Tab / →      Focus next pane; Shift-Tab / ← goes back\n  0            Show and focus the cue list\n  c            Show/hide the cue list\n  1–9          Focus shell pane by number\n  l / h        Cycle layout / toggle header\n  x            Restart focused shell (ends its current session)\n  q            Quit and close all shells\n\nIn Cues: ↑/↓ browse, Enter sends the selected cue, e edits it; o edits the entire demo.\nTab/Esc returns to a shell. Enter resumes a partially sent current cue.\nCommands are dispatched in order without waiting for completion.\n\nAlt-Left/Right rotates focus, including Cues. Ghostty mappings also accept Alt-B/F. Click a pane to focus.\nDrag a shared border to resize. Grid rows are equal height.\nScroll wheel uses scrollback; Shift-wheel overrides application mouse mode.\nAlt-click opens HTTP(S) links. Cmd-click works locally on macOS outside tmux when the host forwards the click.\nOver SSH, URL openers run on the remote host.\n\nEditor: Ctrl-L load, Ctrl-S save as, Ctrl-G apply, Esc cancel.\nLoading previews the file; applying resets queue progress. Changing a pane\nname/shell/args/cwd creates a new session. Removed sessions are closed.\nCommands are sent to the pane's current foreground program: wait for its\nprompt before running the next command. No automatic completion detection.";
+const HELP: &str = "Every pane is a live PTY shell. Type normally; Ctrl-C reaches the shell.\n\nPress Ctrl-G, release, then:\n  n / Enter    Send the next command and advance\n  s            Skip the next command\n  e            Edit current queue item before running it\n  o            Edit full demo (title, add/reorder cues, panes, layout)\n  a            Add and focus an ad hoc shell\n  Tab / →      Focus next pane; Shift-Tab / ← goes back\n  0            Show and focus the cue list\n  c            Show/hide the cue list\n  1–9          Focus shell pane by number\n  l / h        Cycle layout / toggle header\n  x            Restart focused shell (ends its current session)\n  q            Quit and close all shells\n\nIn Cues: ↑/↓ browse, Enter sends the selected cue, e edits it; o edits the entire demo.\np previews the next command per pane; Esc closes, arrows scroll.\nt types those commands without Enter, then focuses the first target shell.\nTab/Esc returns to a shell. Enter resumes a partially sent current cue.\nCommands are dispatched in order without waiting for completion.\n\nAlt-Left/Right rotates focus, including Cues. Ghostty mappings also accept Alt-B/F. Click a pane to focus.\nDrag a shared border to resize. Grid rows are equal height.\nScroll wheel uses scrollback; Shift-wheel overrides application mouse mode.\nAlt-click opens HTTP(S) links. Cmd-click works locally on macOS outside tmux when the host forwards the click.\nOver SSH, URL openers run on the remote host.\n\nEditor: Ctrl-L load, Ctrl-S save as, Ctrl-G apply, Esc cancel.\nLoading previews the file; applying resets queue progress. Changing a pane\nname/shell/args/cwd creates a new session. Removed sessions are closed.\nCommands are sent to the pane's current foreground program: wait for its\nprompt before running the next command. No automatic completion detection.";
 
 #[cfg(all(test, unix))]
 mod tests {
@@ -907,6 +1010,106 @@ mod tests {
         app.step(false).unwrap(); // end is idempotent
     }
     #[test]
+    fn typing_waits_for_enter_and_allows_editing_in_each_shell() {
+        let mut app = app();
+        let dir = tempfile::tempdir().unwrap();
+        let paths = [dir.path().join("first"), dir.path().join("second")];
+        app.demo.queues[0].commands = ["presenter", "observer"]
+            .into_iter()
+            .zip(&paths)
+            .map(|(pane, path)| DemoCommand {
+                pane: pane.into(),
+                command: format!("printf original > '{}'", path.display()),
+            })
+            .collect();
+        app.cues.focused = true;
+        key(&mut app, KeyCode::Char('t'), KeyModifiers::NONE);
+        assert!(!app.cues.focused);
+        assert_eq!(app.active, 0);
+        assert_eq!((app.queue, app.command), (0, 0));
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        assert!(paths.iter().all(|path| !path.exists()));
+        for (index, path) in paths.iter().enumerate() {
+            // Replace the prepared line using the shell's own line editor.
+            app.panes[index]
+                .write(format!("\x15printf edited > '{}'\r", path.display()).as_bytes())
+                .unwrap();
+        }
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+        while paths
+            .iter()
+            .any(|path| std::fs::read_to_string(path).ok().as_deref() != Some("edited"))
+        {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "typed lines were not editable in both shells"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        assert_eq!((app.queue, app.command), (0, 0));
+    }
+    #[test]
+    fn cue_preview_tracks_remaining_commands_and_never_executes() {
+        let mut app = app();
+        app.demo.queues[0].commands = vec![
+            DemoCommand {
+                pane: "presenter".into(),
+                command: "echo preview-first".into(),
+            },
+            DemoCommand {
+                pane: "observer".into(),
+                command: "echo preview-second".into(),
+            },
+        ];
+        app.demo.queues.push(app.demo.queues[0].clone());
+        app.demo.queues[1].commands.pop();
+        app.demo.validate().unwrap();
+        app.cues.focused = true;
+        assert_eq!(
+            app.pane_preview("presenter"),
+            (Some("echo preview-first"), 1)
+        );
+        assert_eq!(
+            app.pane_preview("observer"),
+            (Some("echo preview-second"), 1)
+        );
+        app.step(true).unwrap();
+        assert_eq!(app.pane_preview("presenter"), (None, 0));
+        app.cues.select(1, 2);
+        assert_eq!(
+            app.pane_preview("presenter"),
+            (Some("echo preview-first"), 1)
+        );
+        key(&mut app, KeyCode::Char('p'), KeyModifiers::NONE);
+        assert!(app.preview);
+        key(&mut app, KeyCode::Enter, KeyModifiers::NONE);
+        app.event(Event::Paste("do not send".into()));
+        assert_eq!((app.queue, app.command, app.cues.selected), (0, 1, 1));
+        for (width, height) in [(120, 30), (8, 4), (1, 1)] {
+            let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+            app.resize(Rect::new(0, 0, width, height)).unwrap();
+            terminal.draw(|frame| app.draw(frame)).unwrap();
+            if width == 120 {
+                let text: String = terminal
+                    .backend()
+                    .buffer()
+                    .content()
+                    .iter()
+                    .map(|cell| cell.symbol())
+                    .collect();
+                assert!(text.contains("echo preview-first"));
+                assert!(text.contains("No pending command for this cue"));
+            }
+        }
+        key(&mut app, KeyCode::Esc, KeyModifiers::NONE);
+        assert!(!app.preview);
+        assert!(app.cues.focused);
+        assert_eq!((app.queue, app.command), (0, 1));
+        app.demo.queues.clear();
+        key(&mut app, KeyCode::Char('p'), KeyModifiers::NONE);
+        assert!(!app.preview);
+    }
+    #[test]
     fn cue_navigation_edit_execution_and_visibility() {
         let mut app = app();
         let mut second = app.demo.queues[0].clone();
@@ -969,28 +1172,23 @@ mod tests {
                 command: output(&first, "skipped"),
             },
             DemoCommand {
-                pane: "presenter".into(),
-                command: output(&first, "sent"),
-            },
-            DemoCommand {
                 pane: "observer".into(),
                 command: output(&second, "sent"),
             },
         ];
+        app.demo.validate().unwrap();
         app.step(true).unwrap();
         app.cues.focused = true;
         key(&mut app, KeyCode::Enter, KeyModifiers::NONE);
         assert_eq!((app.queue, app.command), (1, 0));
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
         while std::time::Instant::now() < deadline {
-            if std::fs::read_to_string(&first).ok().as_deref() == Some("sent")
-                && std::fs::read_to_string(&second).ok().as_deref() == Some("sent")
-            {
+            if !first.exists() && std::fs::read_to_string(&second).ok().as_deref() == Some("sent") {
                 return;
             }
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
-        panic!("remaining cue commands did not reach both target shells");
+        panic!("remaining cue command did not reach its target shell");
     }
     #[test]
     fn cue_mouse_selection_and_empty_list() {

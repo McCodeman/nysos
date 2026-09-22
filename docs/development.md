@@ -16,6 +16,35 @@ make verify
 make docs-build
 ```
 
+### Automatic environment with direnv
+
+The repository's `.envrc` uses `use flake .` to load the same locked development
+shell automatically. Install direnv separately, then enable its hook in your
+interactive shell if it is not already present:
+
+```sh
+# Zsh: add to ~/.zshrc once
+eval "$(direnv hook zsh)"
+
+# Bash: use this instead in ~/.bashrc
+eval "$(direnv hook bash)"
+```
+
+Open a new shell, enter the repository, and run `direnv allow` once to trust its
+`.envrc`. Future directory changes load the Nix tools automatically and restore
+the previous environment when you leave. In a shell already inside the directory,
+the next prompt runs the hook. `direnv status` shows the current authorization.
+Run `command -v cargo` after entry; it should resolve into `/nix/store/`.
+
+Changes to `flake.nix`, `flake.lock`, `Cargo.toml`, and `Cargo.lock` trigger a
+reload. If `.envrc` changes, inspect it and run `direnv allow` again. Generated
+profiles live under `.direnv/`, which is ignored by Git. The initial activation
+may download dependencies. Standard direnv's flake support is sufficient;
+nix-direnv is an optional caching enhancement. `nix develop` remains available
+for shells without a direnv hook and for CI.
+
+### Toolchain contents
+
 `flake.lock` pins Nixpkgs and the development/build dependencies. The shell
 provides Rust, Cargo, rustfmt, Clippy, rust-analyzer, Make, Git, pkg-config,
 Python 3.13, uv, mandoc, Zsh, and nixfmt. Darwin gets an Apple SDK and libiconv;

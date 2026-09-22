@@ -15,7 +15,15 @@ the system clipboard with your host terminal's paste shortcut.
 | Ctrl-G / F4 | Validate and apply without saving |
 | Esc | Cancel the popup |
 
-Errors stay in the popup so you can correct them. Save replaces an existing
+Use the **Control** key on macOS, not Command (⌘). Inside the editor, press the
+shortcut directly: do **not** send the nysos prefix first. For example, Ctrl-S
+opens Save; Ctrl-G applies immediately rather than starting a command sequence.
+The F2/F3/F4 alternatives may require Fn on a Mac keyboard.
+
+Save and Apply validate TOML before proceeding. If the editor stays open, read
+the error below the text: fix it and press the action again. Save first opens a
+path prompt; press Enter there to finish saving. Errors stay in the popup so you
+can correct them. Save replaces an existing
 file atomically on macOS/Linux. Paths are literal, relative to the launch
 directory; use an absolute path rather than `~` expansion. Esc in a path prompt
 cancels the editing operation. Saved files are normalized TOML; comments are not
@@ -85,3 +93,24 @@ behind the modal.
 Use the [configuration reference](../reference/configuration.md) for allowed
 fields and values. A queue-only editor accepts a single `name`, `description`,
 and `commands` table without a `[[queues]]` heading.
+
+## Diagnose keys in your actual session
+
+Run a freshly built nysos with `--debug-keys` (for example,
+`nix develop --command cargo run -- --debug-keys --config demo.toml`). The bottom
+line shows the last key event and the current editor mode, even while a popup is
+open. It displays input on screen only; it does not write a key log. Avoid typing
+sensitive input while this diagnostic is enabled.
+
+Open the full editor, then press Ctrl-L once. Expected input is `Char('l')`,
+`CONTROL`, `Press`; the mode should change from `full demo` to `load path`.
+Ctrl-S similarly changes to `save path` when the TOML is valid. Ctrl-G closes the
+editor after a successful apply. If the last event does not change, the key did
+not reach nysos. `SUPER` indicates a Command-key event, and `Paste` is not treated
+as a shortcut. `single cue` means the full-file Load/Save actions are unavailable;
+close it with Esc and open the full demo with prefix-o.
+
+If a correctly received key leaves the full editor open, read the validation
+error below the text. Include the displayed input, mode, error (if any), and
+whether you are using tmux or SSH when reporting the problem. Exit and relaunch
+without `--debug-keys` to hide the diagnostic line.

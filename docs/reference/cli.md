@@ -10,6 +10,9 @@ Loading a demo never automatically executes its queued commands.
 Usage: nysos [OPTIONS]
 
 Options:
+      --debug-keys
+          Show the last key event and editor mode for shortcut troubleshooting
+
       --terminal-keys <PROFILE>
           Terminal key mappings: auto detects Ghostty from TERM_PROGRAM or TERM
 

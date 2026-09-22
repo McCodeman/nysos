@@ -15,6 +15,7 @@
 | Edited commands run again | Applying a queue edit rewinds that item; applying a full demo rewinds all queue progress. Remove already-completed commands before applying a queue edit if needed. |
 | Comments disappear after save | The modal serializes normalized TOML and does not preserve comments. Keep annotated templates separately. |
 | Changes are gone after exit | Layout changes, ad hoc panes, and edits are in memory until saved through prefix-o, Ctrl-S. |
+| Full-editor shortcut seems ignored | Use Control, not macOS Command, and no prefix inside the modal. Try F2/F3/F4 (Fn may be required). Save/Apply keeps the editor open for invalid TOML; read the error below the text. Confirm a load/save path with Enter. |
 | Save failed | Check the destination's parent directory and write access. Paths are literal: use an absolute path instead of `~`. |
 
 `--check` prints a success summary and exits 0 for structurally valid demos; errors

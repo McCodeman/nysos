@@ -83,6 +83,7 @@ fn main() -> Result<()> {
         bail!("nysos requires an interactive terminal; use --check to validate a demo");
     }
     let mut app = app::App::new(demo, args.config.unwrap_or_else(|| "demo.toml".into()))?;
+    app.debug_keys = args.debug_keys;
     let previous_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         drop(TerminalGuard);

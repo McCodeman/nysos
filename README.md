@@ -21,6 +21,11 @@ make build
 make run
 ```
 
+With direnv installed and its shell hook enabled, run `direnv allow` once in
+this directory. The checked-in `.envrc` then loads the Nix development shell on
+entry and restores your previous environment on exit. See
+[development setup](docs/development.md#automatic-environment-with-direnv).
+
 Press **Ctrl-G**, release, then **n** to run the next command. **Ctrl-G, ?**
 shows controls; **Ctrl-G, q** quits.
 The left cue list supports **Up/Down**, **Enter** to run a cue, and **e** to edit

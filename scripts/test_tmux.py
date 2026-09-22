@@ -21,7 +21,8 @@ def exercise(legacy=False):
         socket = str(root / 'socket')
         done = root / 'executed'
         config = root / 'demo.toml'
-        config.write_text(f'''header = true
+        config.write_text(f'''prefix = "{'ctrl-b' if legacy else 'ctrl-g'}"
+header = true
 [[panes]]
 name = "shell"
 shell = "/bin/sh"
@@ -80,6 +81,23 @@ commands = [{{pane = "shell", command = "touch {done}"}}]
                 wait_for(lambda: 'o edit demo/add cues' not in screen())
                 send(left)
                 wait_for(lambda: 'o edit demo/add cues' in screen())
+            # Full-editor actions are direct chords, not prefix sequences.
+            for load, save, apply in [(b'\x0c', b'\x13', b'\x07'), (b'\x1bOQ', b'\x1bOR', b'\x1bOS')]:
+                send(b'o')
+                wait_for(lambda: 'Full demo TOML' in screen())
+                send(load)
+                wait_for(lambda: 'Load path' in screen())
+                send(b'\r')
+                wait_for(lambda: 'Full demo TOML' in screen())
+                send(apply)
+                wait_for(lambda: 'Full demo TOML' not in screen())
+                send(b'o')
+                wait_for(lambda: 'Full demo TOML' in screen())
+                send(save)
+                wait_for(lambda: 'Save path' in screen())
+                send(b'\r')
+                wait_for(lambda: 'Save path' not in screen())
+                assert 'title = "nysos demo"' in config.read_text()
             send(b'\x1b[B')
             wait_for(lambda: '2/2' in screen().splitlines()[1])
             send(b'e')
@@ -111,4 +129,4 @@ commands = [{{pane = "shell", command = "touch {done}"}}]
 
 for legacy in (False, True):
     exercise(legacy)
-    print('PASS: tmux client, SSH environment, cue navigation/edit/run, Alt/Option focus, mouse, resize, quit; prefix=' + ('ctrl-b' if legacy else 'ctrl-g'))
+    print('PASS: tmux client, SSH environment, full-editor Ctrl/F-key load/save/apply, cues, Alt/Option focus, mouse, resize, quit; prefix=' + ('ctrl-b' if legacy else 'ctrl-g'))

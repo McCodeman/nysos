@@ -60,6 +60,8 @@ pub struct App {
     pending_demo: Option<Demo>,
     help: bool,
     pub quit: bool,
+    pub debug_keys: bool,
+    last_key: String,
     status: String,
     rects: Vec<Rect>,
     drag: Option<usize>,
@@ -92,6 +94,8 @@ impl App {
             pending_demo: None,
             help: false,
             quit: false,
+            debug_keys: false,
+            last_key: "Waiting for a key".into(),
             status: format!(
                 "Keys: {terminal_label} · Prefix then ? for help · n runs the next command"
             ),
@@ -243,7 +247,7 @@ impl App {
                 Paragraph::new(if !editor.error.is_empty() {
                     editor.error.as_str()
                 } else if editor.kind == EditorKind::Demo {
-                    "Edit title at the top. Add/reorder [[queues]] below. Ctrl-L loads a file; Ctrl-S saves."
+                    "Use Control, not Cmd; no prefix. F2 load · F3 save · F4 apply. Edit title at top; add/reorder [[queues]] below."
                 } else if matches!(editor.kind, EditorKind::Queue(_)) {
                     "Editing one cue. Esc then prefix-o opens the full demo to add cues or edit its title."
                 } else {
@@ -279,12 +283,43 @@ impl App {
         {
             frame.set_cursor_position(pos);
         }
+        if self.debug_keys && area.height > 0 {
+            let mode = match self.editor.as_ref().map(|editor| editor.kind) {
+                Some(EditorKind::Demo) => "full demo",
+                Some(EditorKind::Queue(_)) => "single cue",
+                Some(EditorKind::LoadPath) => "load path",
+                Some(EditorKind::SavePath) => "save path",
+                None if self.help => "help",
+                None if self.cues.focused => "cue list",
+                None => "shell",
+            };
+            let row = Rect::new(area.x, area.bottom() - 1, area.width, 1);
+            frame.render_widget(Clear, row);
+            frame.render_widget(
+                Paragraph::new(format!("Input: {} | Mode: {mode}", self.last_key))
+                    .style(Style::default().fg(Color::Yellow).bg(Color::Black)),
+                row,
+            );
+        }
     }
     pub fn event(&mut self, event: Event) {
+        if self.debug_keys {
+            match &event {
+                Event::Key(key) => {
+                    self.last_key = format!("{:?} {:?} {:?}", key.code, key.modifiers, key.kind);
+                }
+                Event::Paste(_) => self.last_key = "Paste (not a shortcut)".into(),
+                _ => {}
+            }
+        }
         let result = self.handle(event);
         if let Err(error) = result {
             if let Some(editor) = &mut self.editor {
-                editor.error = format!("{error:#}");
+                editor.error = if let Some(parse) = error.downcast_ref::<toml::de::Error>() {
+                    format!("Invalid TOML: {}\n\n{error:#}", parse.message())
+                } else {
+                    format!("{error:#}")
+                };
             } else {
                 self.status = format!("Error: {error:#}");
             }
@@ -795,6 +830,22 @@ mod tests {
         app.event(Event::Key(KeyEvent::new(code, modifiers)));
     }
     #[test]
+    fn key_diagnostic_shows_received_control_and_active_popup() {
+        let mut app = app();
+        app.debug_keys = true;
+        app.edit_demo().unwrap();
+        key(&mut app, KeyCode::Char('l'), KeyModifiers::CONTROL);
+        let mut terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
+        app.resize(Rect::new(0, 0, 100, 30)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        let row: String = (0..100)
+            .map(|x| terminal.backend().buffer()[(x, 29)].symbol())
+            .collect();
+        assert!(row.contains("Char('l')"));
+        assert!(row.contains("CONTROL"));
+        assert!(row.contains("Mode: load path"));
+    }
+    #[test]
     fn ctrl_g_controls_demo_without_claiming_ctrl_space() {
         let mut app = app();
         key(&mut app, KeyCode::Char(' '), KeyModifiers::CONTROL);
@@ -980,6 +1031,18 @@ mod tests {
         app.editor = Some(Editor::new(EditorKind::Demo, "invalid toml!".into()));
         key(&mut app, KeyCode::Char('g'), KeyModifiers::CONTROL);
         assert!(!app.editor.as_ref().unwrap().error.is_empty());
+        app.editor = Some(Editor::new(EditorKind::Demo, "unsupported = true".into()));
+        key(&mut app, KeyCode::Char('s'), KeyModifiers::CONTROL);
+        let editor = app.editor.as_ref().unwrap();
+        assert!(matches!(editor.kind, EditorKind::Demo));
+        assert!(
+            editor
+                .error
+                .lines()
+                .next()
+                .unwrap()
+                .contains("unknown field")
+        );
     }
     #[test]
     fn mouse_focus_drag_add_and_small_terminal_render() {

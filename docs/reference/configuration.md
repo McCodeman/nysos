@@ -6,13 +6,35 @@ invalid enum values are rejected. All paths resolve relative to nysos's launch
 directory, not the configuration file's directory; `~` and environment variables
 inside configured paths are not expanded.
 
+## Configuration structure
+
+The tables below list **every supported field**. Field names and enum strings
+are case-sensitive. Booleans are unquoted `true` or `false`; integers are
+unquoted whole numbers. Unknown keys are rejected at every level, including
+inside panes, queues, and commands.
+
+| Location | All valid keys |
+| --- | --- |
+| Top level | `title`, `prefix`, `terminal_keys`, `header`, `cue_list`, `cue_width`, `layout`, `panes`, `queues` |
+| Each `[[panes]]` | `name`, `shell`, `args`, `cwd`, `scheme`, `weight` |
+| Each `[[queues]]` | `name`, `description`, `commands` |
+| Each command in a queue | `pane`, `command` |
+
+A **cue** in the UI is a `[[queues]]` item in TOML; `cues` is not an alias.
+Pane count comes from the number of `[[panes]]` entries, not a `pane_count`
+setting. A pane's `name` is also its displayed title; there is no pane `title`
+field. `scheme` selects a built-in palette; there is no `color` or custom RGB
+field. Keyboard mapping settings belong at the top level, not inside panes.
+
 ## Complete example
 
-This example uses `/bin/sh` on both macOS and Linux:
+This standalone example includes every supported field and uses `/bin/sh` on
+both macOS and Linux. `cwd = "."` means the nysos launch directory:
 
 ```toml
 title = "Service walkthrough"
 prefix = "ctrl-g"
+terminal_keys = "auto"
 header = true
 cue_list = true
 cue_width = 26
@@ -22,6 +44,7 @@ layout = "columns"
 name = "presenter"
 shell = "/bin/sh"
 args = []
+cwd = "."
 scheme = "ocean"
 weight = 3
 
@@ -56,7 +79,7 @@ commands = [
 | `title` | String | `"nysos demo"` | Nonempty demo title displayed above cue details when the header is enabled; control characters are rejected. |
 | `terminal_keys` | String enum | `"auto"` | `"auto"` detects Ghostty using TERM_PROGRAM/TERM; `"ghostty"` adds Alt-B/F focus aliases; `"standard"` preserves those shell keys. `--terminal-keys` overrides at startup. |
 | `prefix` | String enum | `"ctrl-g"` | Control prefix: `"ctrl-g"`, `"ctrl-a"`, `"ctrl-b"`, or `"f12"`. `--prefix` overrides it at startup. |
-| `header` | Boolean | `true` | Show queue item index, name, description, and next command above the panes. |
+| `header` | Boolean | `true` | Show the demo title, cue index/name/description, command index, and next command above the panes. When the cue list is focused, preview its selection. |
 | `cue_list` | Boolean | `true` | Show the left cue sidebar; toggle with Ctrl-G, c. |
 | `cue_width` | Integer | `26` | Sidebar width including borders, 16–60 columns; capped at half the content width in small terminals. |
 | `layout` | String enum | `"columns"` | `"columns"`, `"rows"`, or `"grid"`. |
@@ -67,6 +90,12 @@ Defaults apply independently: omitting `queues` retains the built-in commands
 for `presenter` and `observer`. If you define other pane names, explicitly supply
 `queues` or set `queues = []`. Otherwise validation may report an unknown target.
 An empty TOML file describes the built-in demo; `panes = []` is invalid.
+
+The omitted `panes` array creates `presenter` (ocean) and `observer` (ember),
+each with weight 1 and the normal shell/args/cwd defaults. The omitted `queues`
+array creates one `Welcome` cue with two commands: `printf 'Welcome to nysos!\n'`
+in `presenter`, then `pwd` in `observer`. Generate the current full defaults with
+`nysos --init demo.toml`; it refuses to overwrite an existing file.
 
 For a purely interactive single-pane demo:
 
@@ -79,6 +108,40 @@ name = "scratch"
 
 Put top-level assignments before the first `[[panes]]` or `[[queues]]` table;
 TOML assignments after a table header belong to that table.
+
+### Prefix values
+
+| Value | Prefix key |
+| --- | --- |
+| `"ctrl-g"` | Ctrl-G (default; distinct from default tmux Ctrl-B) |
+| `"ctrl-a"` | Ctrl-A |
+| `"ctrl-b"` | Ctrl-B (legacy nysos binding) |
+| `"f12"` | F12 |
+
+Press and release the prefix, then the action key. Press it twice to forward one
+literal prefix to the focused shell. Ctrl-Space is not an accepted value.
+Shortcuts in these docs use the default Ctrl-G; substitute your chosen prefix.
+Modal shortcuts such as Ctrl-G/F4 to apply remain unchanged.
+
+### Terminal key profile values
+
+| Value | Behavior |
+| --- | --- |
+| `"auto"` | Detect once from the environment when nysos starts (default). |
+| `"standard"` | Alt-Left/Right rotates focus; Alt-B/F is forwarded to the shell. |
+| `"ghostty"` | Alt-Left/Right and Alt-B/F rotate focus; handles Ghostty's default macOS Option-arrow sequences. |
+
+Auto chooses Ghostty when `TERM_PROGRAM` equals `ghostty` (ignoring case).
+If `TERM_PROGRAM` is absent, empty, or exactly `tmux`, `TERM=xterm-ghostty` also
+selects Ghostty. All other cases select standard, including an explicitly named
+other terminal with a conflicting TERM value. tmux/SSH can hide or retain stale
+environment values; use an explicit profile when necessary. The detected profile
+is not refreshed on tmux reattachment. The active profile appears in help.
+
+`--prefix` and `--terminal-keys` override their TOML values at startup. Editing
+or loading a full demo afterward uses that demo's values, and saving writes the
+current values. Other configuration fields have no corresponding CLI overrides.
+See [tmux and SSH](../guide/tmux-ssh.md) for examples.
 
 ## Pane fields: `[[panes]]`
 
@@ -97,7 +160,15 @@ A name that contains only whitespace is rejected.
 
 Shell paths and working directories are checked only when a PTY starts, not by
 `--check`. Shell commands do not belong in `shell`: use `shell = "/bin/zsh"` and
-`args = ["-l"]`, rather than `shell = "/bin/zsh -l"`. Every PTY receives
+`args = ["-l"]`, rather than `shell = "/bin/zsh -l"`. A shell name such as
+`"bash"` is resolved using PATH. No arguments, including login flags, are added
+implicitly. The `$SHELL` fallback applies when that environment variable is
+unavailable; an explicitly empty shell value fails validation. An explicit `cwd`
+must be an existing directory when the pane starts.
+
+Panes inherit the process environment; there is no per-pane `env` table. To set
+variables for later commands, send shell `export` commands or invoke a wrapper
+script as the shell. Every PTY receives
 `TERM=xterm-256color` and `COLORTERM=truecolor`.
 
 ### Layout and weights
@@ -110,7 +181,7 @@ Shell paths and working directories are checked only when a PTY starts, not by
 
 Weights are ratios, not percentages or fixed sizes. Two column panes weighted
 3 and 2 occupy approximately 60% and 40% of the available width, including their
-borders. Dragging a divider updates weights; save the demo to persist them.
+borders, after space for the header, footer, and cue list has been removed. Dragging a divider updates weights; save the demo to persist them.
 
 ### Color schemes
 
@@ -128,14 +199,18 @@ are rendered separately. Custom RGB theme definitions are not supported yet.
 
 | Field | Type | Default when omitted | Meaning / validation |
 | --- | --- | --- | --- |
-| `name` | String | Required | Nonempty label in the header; queue names need not be unique. |
-| `description` | String | `""` | Presenter-facing description in the header. |
+| `name` | String | Required | Label in the cue list and header; cannot be empty or whitespace-only. Cue names need not be unique. |
+| `description` | String | `""` | Free-form presenter-facing text in the header; empty or multiline text is accepted, but the fixed-height header can clip long text. |
 | `commands` | Array of command tables | Required | One or more commands, sent in listed order. |
 
 Ctrl-G, n sends a single command. Enter in the cue sidebar sends all remaining
 commands of the selected item in order, without waiting for completion. Commands
 can target different panes within the same item. Skipping advances
 past one command; finishing the last command advances to the next queue item.
+There is no configured limit on the number of cues or commands per cue.
+`queues = []` is valid; `commands = []` within a cue is invalid. Shell commands
+are sent with Enter to the target pane's current foreground program, not always
+to a fresh shell. Do not assume completion before sending the next command.
 
 ## Command fields
 
@@ -160,20 +235,74 @@ commands = [
 ]
 ```
 
+### Nested command tables
+
+Commands may be inline tables (as above) or `[[queues.commands]]` tables. This
+standalone example uses the latter, with multiple commands in one cue:
+
+```toml
+title = "Nested command example"
+
+[[panes]]
+name = "shell"
+shell = "/bin/sh"
+
+[[queues]]
+name = "Inspect"
+description = "Both commands target the same existing shell."
+
+[[queues.commands]]
+pane = "shell"
+command = "pwd"
+
+[[queues.commands]]
+pane = "shell"
+command = "ls -lah"
+
+[[queues]]
+name = "Finish"
+commands = [{ pane = "shell", command = "printf 'Done\\n'" }]
+```
+
+Each `[[queues.commands]]` belongs to the most recent `[[queues]]`. Put the cue's
+`name` and `description` before its command tables. Do not also define a
+`commands = [...]` array for the same cue; TOML rejects duplicate definitions.
+
 ## Validation and applying changes
 
 ```sh
 nysos --config demo.toml --check
 ```
 
-Validation rejects malformed TOML, unknown fields, zero or more than 16 panes,
-duplicate or blank pane names, empty shells, out-of-range weights, empty queue
-names/lists, unknown command targets, and blank or multiline commands. It does
-not execute anything or check shell syntax.
+Validation rejects malformed TOML, wrong value types, unknown fields/enum values,
+blank titles or titles containing control characters, cue widths outside 16–60,
+zero or more than 16 panes, duplicate or blank pane names, empty shells, weights
+outside 1–1000, missing/blank cue names, missing/empty command lists, unknown
+command targets, and blank commands or commands containing NUL/CR/LF. Integer
+bounds are inclusive. A disabled sidebar still requires a valid `cue_width`.
+
+Validation does not execute anything or check shell syntax, executable
+availability, working-directory existence, service readiness, or whether a
+terminal forwards a chosen key. Shell and cwd failures appear when sessions
+start. There is no per-command `delay`, `timeout`, `env`, `cwd`, or completion
+condition; unsupported keys are rejected rather than ignored.
 
 Full-demo apply resets queue progress. Panes with matching name, shell, arguments,
 and working directory retain their sessions. A changed identity or shell setup
 starts a replacement session, and removed panes are closed. Scheme and weight
-changes reuse the shell. A cue-only edit rewinds the edited item if it is the current playback item;
+changes reuse the shell. Title, prefix, and sidebar changes also preserve matching
+sessions. A cue-only edit rewinds the edited item if it is the current playback item;
 editing another item leaves playback progress unchanged.
 See [editing and saving](../guide/editor.md) for the save/load workflow.
+
+## Editing a whole demo versus one cue
+
+**Prefix, o**, or plain **o** in the cue list, edits a full document matching this
+reference. **e** in the cue list edits only one cue: `name`, `description`, and
+`commands`, without a `[[queues]]` heading. Top-level fields such as `title` and
+pane settings are not valid in that single-cue editor.
+
+Use Ctrl-L/F2 in the full editor to load an entire file, Ctrl-G/F4 to apply, or
+Ctrl-S/F3 to save and apply. Loading only previews; applying never executes queued
+commands. Saving normalizes TOML and drops comments; runtime queue progress is not
+saved. See [editing and saving](../guide/editor.md) for a step-by-step workflow.

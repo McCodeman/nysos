@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/McCodeman/nysos/compare/v0.1.4...v0.1.5) (2026-09-24)
+
+
+### Features
+
+* preserve cue layouts and improve the guided demo ([2e5d791](https://github.com/McCodeman/nysos/commit/2e5d79192dd0151de9abb67b8f994e1948cc9880))
+
 ## [0.1.4](https://github.com/McCodeman/nysos/compare/v0.1.3...v0.1.4) (2026-09-22)
 
 

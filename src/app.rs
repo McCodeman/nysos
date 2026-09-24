@@ -55,6 +55,27 @@ impl Editor {
     }
 }
 
+#[derive(Clone)]
+struct LayoutSnapshot {
+    layout: crate::config::Layout,
+    weights: Vec<u16>,
+}
+impl LayoutSnapshot {
+    fn capture(demo: &Demo, cue: Option<usize>) -> Self {
+        Self {
+            layout: demo.layout_for(cue).clone(),
+            weights: demo.panes.iter().map(|p| p.weight).collect(),
+        }
+    }
+    fn configs(&self, demo: &Demo) -> Vec<PaneConfig> {
+        let mut configs = demo.panes.clone();
+        for (config, weight) in configs.iter_mut().zip(&self.weights) {
+            config.weight = *weight;
+        }
+        configs
+    }
+}
+
 pub struct App {
     pub demo: Demo,
     pub panes: Vec<Pane>,
@@ -63,6 +84,9 @@ pub struct App {
     command: usize,
     layout_cue: Option<usize>,
     layout_applied: Option<usize>,
+    cue_layouts: HashMap<usize, LayoutSnapshot>,
+    // Historical browsing never mutates the live layout or its weights.
+    viewed_layout: Option<LayoutSnapshot>,
     pub path: PathBuf,
     prefix: bool,
     detected_terminal: crate::prefix::TerminalKeys,
@@ -115,6 +139,8 @@ impl App {
             command: 0,
             layout_cue: None,
             layout_applied: None,
+            cue_layouts: HashMap::new(),
+            viewed_layout: None,
             path,
             prefix: false,
             detected_terminal,
@@ -187,13 +213,26 @@ impl App {
         let horizontal =
             UiLayout::horizontal([Constraint::Length(width), Constraint::Min(0)]).split(chunks[1]);
         self.cues.resize(horizontal[0], self.demo.queues.len());
-        let geometry = layout::panes(
-            horizontal[1],
-            self.demo.layout_for(self.layout_cue),
-            &self.demo.panes,
-        );
+        let geometry = if let Some(snapshot) = &self.viewed_layout {
+            layout::panes(
+                horizontal[1],
+                &snapshot.layout,
+                &snapshot.configs(&self.demo),
+            )
+        } else {
+            layout::panes(
+                horizontal[1],
+                self.demo.layout_for(self.layout_cue),
+                &self.demo.panes,
+            )
+        };
         self.rects = geometry.panes;
         self.dividers = geometry.dividers;
+        if !self.pane_visible(self.active) {
+            self.active = (0..self.panes.len())
+                .find(|&i| self.pane_visible(i))
+                .unwrap_or(0);
+        }
         for (pane, rect) in self.panes.iter_mut().zip(&self.rects) {
             pane.configure_line_numbers(
                 self.demo
@@ -201,7 +240,10 @@ impl App {
                     .contains(&crate::features::Feature::LineNumbers),
                 self.demo.line_numbers,
             );
-            pane.resize(pane.body_area(inner(*rect)))?;
+            // Hidden sessions keep their terminal size, history, and running processes.
+            if rect.width > 0 && rect.height > 0 {
+                pane.resize(pane.body_area(inner(*rect)))?;
+            }
         }
         Ok(())
     }
@@ -249,6 +291,9 @@ impl App {
                 .draw(frame, &self.demo.queues, self.queue, self.command);
         }
         for (i, (pane, &area)) in self.panes.iter().zip(&self.rects).enumerate() {
+            if area.width == 0 || area.height == 0 {
+                continue;
+            }
             let (fg, bg, accent) = palette(pane.config.scheme);
             let title = format!(
                 " {} · {}{} ",
@@ -528,23 +573,22 @@ impl App {
                                 '-' => (Axis::Rows, -1),
                                 _ => (Axis::Rows, 1),
                             };
+                            let dividers = self.dividers.clone();
+                            let rect = self.rects.get(self.active).copied();
                             let changed = !self.cues.focused
-                                && self.rects.get(self.active).is_some_and(|rect| {
-                                    layout::resize_focused(
-                                        &mut self.demo,
-                                        self.layout_cue,
-                                        &self.dividers,
-                                        *rect,
-                                        axis,
-                                        delta,
-                                    )
+                                && rect.is_some_and(|rect| {
+                                    self.edit_display_layout(|demo, cue| {
+                                        layout::resize_focused(
+                                            demo, cue, &dividers, rect, axis, delta,
+                                        )
+                                    })
                                 });
-                            self.status = if changed { "Pane resized · save the full demo to keep its layout" } else { "Focus a shell with a resizable split on that axis; use prefix o to edit layout" }.into();
+                            self.status = if changed && self.viewed_layout.is_some() { "Historical view resized · b restores the live layout" } else if changed { "Pane resized · save the full demo to keep its layout" } else { "Focus a shell with a resizable split on that axis; use prefix o to edit layout" }.into();
                         }
                         KeyCode::Char('#') => self.toggle_line_numbers()?,
                         KeyCode::Char('h') => self.demo.header = !self.demo.header,
                         KeyCode::Char('l') => {
-                            self.demo.layout_for_mut(self.layout_cue).cycle();
+                            self.edit_display_layout(|demo, cue| demo.layout_for_mut(cue).cycle());
                             self.drag = None;
                         }
                         KeyCode::Char('x') if !self.cues.focused => {
@@ -554,7 +598,7 @@ impl App {
                         KeyCode::Char('?') => self.help = true,
                         KeyCode::Char(c @ '1'..='9') => {
                             let i = (c as u8 - b'1') as usize;
-                            if i < self.panes.len() {
+                            if i < self.panes.len() && self.pane_visible(i) {
                                 self.active = i;
                                 self.cues.focused = false;
                             }
@@ -589,12 +633,47 @@ impl App {
         } else {
             self.active + extra
         };
-        let next = (position as isize + direction).rem_euclid((self.panes.len() + extra) as isize)
-            as usize;
+        let count = self.panes.len() + extra;
+        let next = (1..=count)
+            .map(|step| {
+                (position as isize + direction * step as isize).rem_euclid(count as isize) as usize
+            })
+            .find(|&next| (extra == 1 && next == 0) || self.pane_visible(next - extra))
+            .unwrap_or(position);
         self.cues.focused = extra == 1 && next == 0;
         if !self.cues.focused {
             self.active = next - extra;
         }
+    }
+    fn pane_visible(&self, index: usize) -> bool {
+        self.viewed_layout
+            .as_ref()
+            .map_or_else(
+                || self.demo.layout_for(self.layout_cue),
+                |snapshot| &snapshot.layout,
+            )
+            .contains_pane(&self.panes[index].config.id)
+    }
+    fn edit_display_layout<T>(&mut self, edit: impl FnOnce(&mut Demo, Option<usize>) -> T) -> T {
+        if let Some(snapshot) = &self.viewed_layout {
+            let mut demo = self.demo.clone();
+            demo.layout = snapshot.layout.clone();
+            demo.panes = snapshot.configs(&self.demo);
+            let result = edit(&mut demo, None);
+            self.viewed_layout = Some(LayoutSnapshot::capture(&demo, None));
+            result
+        } else {
+            edit(&mut self.demo, self.layout_cue)
+        }
+    }
+    fn return_to_live(&mut self) -> Result<()> {
+        self.viewed_layout = None;
+        self.drag = None;
+        self.resize(self.viewport)?;
+        for pane in &mut self.panes {
+            pane.term.scroll_display(Scroll::Bottom);
+        }
+        Ok(())
     }
     fn toggle_line_numbers(&mut self) -> Result<()> {
         if !self
@@ -704,7 +783,9 @@ impl App {
             pane.send_action(action, true)?;
             pane.config.apply_command_style(action);
         }
-        self.active = *first;
+        if self.pane_visible(*first) {
+            self.active = *first;
+        }
         self.cues.focused = false;
         self.status =
             "Typed without Enter · key/clear actions sent immediately · cue progress unchanged"
@@ -712,10 +793,22 @@ impl App {
         Ok(())
     }
     fn apply_cue_layout(&mut self, index: usize) -> Result<()> {
+        if self.viewed_layout.is_some() {
+            self.return_to_live()?;
+        }
         if self.demo.queues[index].layout.is_some() {
             self.layout_cue = Some(index);
             self.drag = None;
             self.resize(self.viewport)?;
+        }
+        self.cue_layouts
+            .insert(index, LayoutSnapshot::capture(&self.demo, self.layout_cue));
+        // Include visible panes without an action, so the whole historical view is useful.
+        for i in 0..self.panes.len() {
+            if self.pane_visible(i) {
+                self.panes[i].pump()?;
+                self.panes[i].bookmark(index);
+            }
         }
         Ok(())
     }
@@ -771,14 +864,28 @@ impl App {
             }
             KeyCode::Char('s') => {
                 self.advance = None;
+                if let Some(snapshot) = self.cue_layouts.get(&self.cues.selected) {
+                    self.viewed_layout = Some(snapshot.clone());
+                    self.drag = None;
+                    self.resize(self.viewport)?;
+                } else {
+                    self.status = "No recorded layout or bookmarks for this cue".into();
+                    return Ok(());
+                }
                 let mut restored = 0;
                 let mut targets = 0;
                 if let Some(cue) = self.demo.queues.get(self.cues.selected) {
                     for pane in &mut self.panes {
-                        if cue
-                            .commands
-                            .iter()
-                            .any(|action| action.pane == pane.config.id)
+                        if self
+                            .viewed_layout
+                            .as_ref()
+                            .unwrap()
+                            .layout
+                            .contains_pane(&pane.config.id)
+                            || cue
+                                .commands
+                                .iter()
+                                .any(|action| action.pane == pane.config.id)
                         {
                             targets += 1;
                             restored += usize::from(pane.restore_bookmark(self.cues.selected));
@@ -786,13 +893,16 @@ impl App {
                     }
                 }
                 self.status = format!(
-                    "Restored {restored}/{targets} pane bookmarks; missing bookmarks were not recorded or have expired"
+                    "Restored {restored}/{targets} pane bookmarks · viewing cue {} layout · b returns live",
+                    self.cues.selected + 1,
                 );
+                if restored < targets {
+                    self.status
+                        .push_str(" · missing bookmarks were not recorded or have expired");
+                }
             }
             KeyCode::Char('b') => {
-                for pane in &mut self.panes {
-                    pane.term.scroll_display(Scroll::Bottom);
-                }
+                self.return_to_live()?;
                 self.status.clear();
             }
             KeyCode::Char('p') if count > 0 => {
@@ -858,6 +968,9 @@ impl App {
         let command_count = queue.commands.len();
         let delay = queue.advance_after_ms;
         if !skip {
+            if self.viewed_layout.is_some() {
+                self.return_to_live()?;
+            }
             if self.layout_applied != Some(self.queue) {
                 self.apply_cue_layout(self.queue)?;
                 self.layout_applied = Some(self.queue);
@@ -905,6 +1018,7 @@ impl App {
         if self.panes.len() >= 16 {
             bail!("Maximum of 16 panes reached");
         }
+        self.return_to_live()?;
         let name = (1..)
             .map(|n| format!("adhoc-{n}"))
             .find(|n| !self.demo.panes.iter().any(|p| p.id == *n))
@@ -923,6 +1037,10 @@ impl App {
         self.drag = None;
         self.demo.panes.push(config);
         self.panes.push(pane);
+        self.cue_layouts.clear();
+        for pane in &mut self.panes {
+            pane.forget_bookmarks();
+        }
         self.active = self.panes.len() - 1;
         self.cues.focused = false;
         self.status = "Added a live pane · prefix o to rename or configure it".into();
@@ -964,6 +1082,8 @@ impl App {
         self.demo = demo;
         self.layout_cue = None;
         self.layout_applied = None;
+        self.cue_layouts.clear();
+        self.viewed_layout = None;
         self.drag = None;
         self.active = self.active.min(self.panes.len() - 1);
         self.queue = 0;
@@ -1040,6 +1160,9 @@ impl App {
                         for pane in &mut self.panes {
                             pane.forget_bookmarks();
                         }
+                        self.cue_layouts.clear();
+                        self.viewed_layout = None;
+                        self.drag = None;
                         self.layout_applied = None;
                         if index == self.queue {
                             self.command = 0;
@@ -1073,7 +1196,8 @@ impl App {
         if matches!(event.kind, MouseEventKind::Drag(MouseButton::Left))
             && let Some(divider) = &self.drag
         {
-            layout::resize_pair(&mut self.demo, self.layout_cue, divider, x, y);
+            let divider = divider.clone();
+            self.edit_display_layout(|demo, cue| layout::resize_pair(demo, cue, &divider, x, y));
             return Ok(());
         }
         if self.demo.cue_list && self.cues.area.contains((x, y).into()) {
@@ -1194,7 +1318,7 @@ fn open_url(url: &str) -> Result<()> {
     });
     Ok(())
 }
-const HELP: &str = "Every pane is a live PTY shell. Type normally; Ctrl-C reaches the shell.\n\nPress Ctrl-G, release, then:\n  n / Enter    Send the next command and advance\n  s            Skip the next command\n  e            Edit current queue item before running it\n  o            Edit full demo (title, add/reorder cues, panes, layout)\n  a            Add and focus an ad hoc shell\n  Tab / →      Focus next pane; Shift-Tab / ← goes back\n  0            Show and focus the cue list\n  c            Show/hide the cue list\n  1–9          Focus shell pane by number\n  l / h        Cycle layout / toggle header\n  #            Toggle focused pane line numbers (line-numbers gate)\n  x            Restart focused shell (ends its current session)\n  q            Quit and close all shells\n\nIn Cues: ↑/↓ browse, Enter sends the selected cue, e edits it; o edits the entire demo.\np previews the next command/key/clear action per pane; Esc closes, arrows scroll.\nt types commands without Enter; keys and native clears are sent immediately.\ns restores the selected cue’s pane bookmarks; b returns all panes to bottom.\nSpace pauses/resumes an armed timer. Browsing or s cancels automatic playback.\nTab/Esc returns to a shell. Enter resumes a partially sent current cue.\nCommands are dispatched in order without waiting for completion.\n\nAlt-Left/Right rotates focus, including Cues. Ghostty mappings also accept Alt-B/F. Click a pane to focus.\nDrag a shared border to resize nested groups. Prefix < / > changes width; - / + changes height. Grid rows are equal height.\nScroll wheel uses scrollback; Shift-wheel overrides application mouse mode.\nAlt-click opens HTTP(S) links. Cmd-click works locally on macOS outside tmux when the host forwards the click.\nOver SSH, URL openers run on the remote host.\n\nEditor: Ctrl-L load, Ctrl-S save as, Ctrl-G apply, Esc cancel.\nLoading previews the file; applying resets queue progress. Changing a pane\nid/shell/args/cwd creates a new session. Removed sessions are closed.\nCommands are sent to the pane's current foreground program: wait for its\nprompt before running the next command. No automatic completion detection.";
+const HELP: &str = "Every pane is a live PTY shell. Type normally; Ctrl-C reaches the shell.\n\nPress Ctrl-G, release, then:\n  n / Enter    Send the next command and advance\n  s            Skip the next command\n  e            Edit current queue item before running it\n  o            Edit full demo (title, add/reorder cues, panes, layout)\n  a            Add and focus an ad hoc shell\n  Tab / →      Focus next pane; Shift-Tab / ← goes back\n  0            Show and focus the cue list\n  c            Show/hide the cue list\n  1–9          Focus shell pane by number\n  l / h        Cycle layout / toggle header\n  #            Toggle focused pane line numbers (line-numbers gate)\n  x            Restart focused shell (ends its current session)\n  q            Quit and close all shells\n\nIn Cues: ↑/↓ browse, Enter sends the selected cue, e edits it; o edits the entire demo.\np previews the next command/key/clear action per pane; Esc closes, arrows scroll.\nt types commands without Enter; keys and native clears are sent immediately.\ns restores the selected cue’s recorded layout and pane bookmarks; b restores the live layout and bottom.\nSpace pauses/resumes an armed timer. Browsing or s cancels automatic playback.\nTab/Esc returns to a shell. Enter resumes a partially sent current cue.\nCommands are dispatched in order without waiting for completion.\n\nAlt-Left/Right rotates focus, including Cues. Ghostty mappings also accept Alt-B/F. Click a pane to focus.\nDrag a shared border to resize nested groups. Prefix < / > changes width; - / + changes height. Grid rows are equal height.\nScroll wheel uses scrollback; Shift-wheel overrides application mouse mode.\nAlt-click opens HTTP(S) links. Cmd-click works locally on macOS outside tmux when the host forwards the click.\nOver SSH, URL openers run on the remote host.\n\nEditor: Ctrl-L load, Ctrl-S save as, Ctrl-G apply, Esc cancel.\nLoading previews the file; applying resets queue progress. Changing a pane\nid/shell/args/cwd creates a new session. Removed sessions are closed.\nCommands are sent to the pane's current foreground program: wait for its\nprompt before running the next command. No automatic completion detection.";
 
 #[cfg(all(test, unix))]
 mod tests {
@@ -1213,6 +1337,159 @@ mod tests {
         app.event(Event::Key(KeyEvent::new(code, modifiers)));
     }
     #[test]
+    fn historical_layouts_preserve_hidden_sessions_and_the_live_arrangement() {
+        use crate::config::{Layout, LayoutNode, LayoutPreset};
+        use alacritty_terminal::grid::Dimensions;
+        let mut app = app();
+        for command in &mut app.demo.queues[0].commands {
+            command.command = ":".into();
+        }
+        // A pane with no action still needs a bookmark in the historical view.
+        app.demo.queues[0].commands.truncate(1);
+        let initial = app.demo.queues[0].clone();
+        let mut hidden = initial.clone();
+        hidden.layout = Some(Layout::Tree(LayoutNode::Pane {
+            pane: "presenter".into(),
+            weight: 1,
+        }));
+        let mut rows = initial.clone();
+        rows.layout = Some(Layout::Preset(LayoutPreset::Rows));
+        app.demo.queues = vec![initial.clone(), hidden, initial.clone(), rows, initial];
+        app.demo.validate().unwrap();
+        let viewport = Rect::new(0, 0, 120, 40);
+        app.resize(viewport).unwrap();
+        let initial_rects = app.rects.clone();
+        let dir = tempfile::tempdir().unwrap();
+        let ready = dir.path().join("ready");
+        app.panes[1]
+            .write(
+                format!(
+                    "remembered=still_alive; printf ready > '{}'\n",
+                    ready.display()
+                )
+                .as_bytes(),
+            )
+            .unwrap();
+        let wait_for = |app: &mut App, path: &std::path::Path, expected: &str| {
+            let deadline = Instant::now() + Duration::from_secs(10);
+            loop {
+                app.tick().unwrap();
+                if std::fs::read_to_string(path).unwrap_or_default() == expected {
+                    break;
+                }
+                assert!(
+                    Instant::now() < deadline,
+                    "shell did not acknowledge command"
+                );
+                std::thread::sleep(Duration::from_millis(5));
+            }
+        };
+        wait_for(&mut app, &ready, "ready");
+        app.execute_selected().unwrap();
+        let hidden_size = (
+            app.panes[1].term.columns(),
+            app.panes[1].term.screen_lines(),
+        );
+        app.active = 1;
+        app.execute_selected().unwrap();
+        assert_eq!(app.rects[1], Rect::default());
+        assert_eq!(app.active, 0);
+        assert_eq!(
+            (
+                app.panes[1].term.columns(),
+                app.panes[1].term.screen_lines()
+            ),
+            hidden_size
+        );
+        app.cues.focused = false;
+        app.rotate(1);
+        assert!(app.cues.focused); // Focus skips the hidden observer.
+        key(&mut app, KeyCode::Char('g'), KeyModifiers::CONTROL);
+        key(&mut app, KeyCode::Char('2'), KeyModifiers::NONE);
+        assert!(app.cues.focused);
+        let done = dir.path().join("done");
+        app.panes[1].write(format!("i=0; while [ $i -lt 60 ]; do printf 'hidden output %s\\n' \"$i\"; i=$((i+1)); done; printf %s \"$remembered\" > '{}'\n", done.display()).as_bytes()).unwrap();
+        wait_for(&mut app, &done, "still_alive");
+        // Pump bytes written immediately before the acknowledgement as well.
+        app.tick().unwrap();
+        assert!(app.panes[1].term.history_size() > 0);
+        app.execute_selected().unwrap(); // Inherits the one-pane layout.
+        let hidden_rects = app.rects.clone();
+        app.execute_selected().unwrap(); // Both panes visible in rows.
+        app.execute_selected().unwrap(); // Inherits rows.
+        let rows_rects = app.rects.clone();
+        app.demo.panes[0].weight = 3; // Manual live resize after the last cue.
+        app.resize(viewport).unwrap();
+        let live_rects = app.rects.clone();
+        assert_ne!(live_rects, rows_rects);
+        let progress = (app.queue, app.command);
+        for (cue, expected) in [
+            (0, &initial_rects),
+            (2, &hidden_rects),
+            (4, &rows_rects),
+            (1, &hidden_rects),
+            (0, &initial_rects),
+        ] {
+            app.cues.select(cue, 5);
+            app.cue_key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE))
+                .unwrap();
+            assert_eq!(&app.rects, expected);
+            assert_eq!((app.queue, app.command), progress);
+            assert_eq!(app.demo.panes[0].weight, 3);
+        }
+        assert!(app.status.contains("Restored 2/2"), "{}", app.status);
+        assert!(app.panes[1].term.grid().display_offset() > 0);
+        // Resizing a historical view must not edit either the saved cue or live view.
+        app.edit_display_layout(|demo, _| demo.panes[0].weight = 9);
+        app.resize(viewport).unwrap();
+        assert_ne!(app.rects, initial_rects);
+        app.cue_key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE))
+            .unwrap();
+        assert_eq!(app.rects, initial_rects);
+        app.cue_key(KeyEvent::new(KeyCode::Char('b'), KeyModifiers::NONE))
+            .unwrap();
+        assert_eq!(app.rects, live_rects);
+        assert!(
+            app.panes
+                .iter()
+                .all(|p| p.term.grid().display_offset() == 0)
+        );
+        // Dispatch from history inherits the live layout, never the browsed layout.
+        app.cues.select(0, 5);
+        app.cue_key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE))
+            .unwrap();
+        app.cues.select(4, 5);
+        app.execute_selected().unwrap();
+        assert_eq!(app.rects, live_rects);
+        assert!(app.viewed_layout.is_none());
+        app.apply(app.demo.clone()).unwrap();
+        assert!(app.cue_layouts.is_empty());
+    }
+
+    #[test]
+    fn typed_layout_bookmarks_and_unexecuted_cues_do_not_replace_live_layout() {
+        use crate::config::{Layout, LayoutPreset};
+        let mut app = app();
+        app.demo.queues[0].commands.truncate(1);
+        app.demo.queues[0].commands[0].command = ":".into();
+        app.demo.queues.push(app.demo.queues[0].clone());
+        app.resize(Rect::new(0, 0, 100, 30)).unwrap();
+        app.type_selected().unwrap();
+        let typed_rects = app.rects.clone();
+        app.demo.layout = Layout::Preset(LayoutPreset::Rows);
+        app.resize(app.viewport).unwrap();
+        let live_rects = app.rects.clone();
+        app.cues.focused = true;
+        key(&mut app, KeyCode::Char('s'), KeyModifiers::NONE);
+        assert_eq!(app.rects, typed_rects);
+        app.cues.select(1, 2);
+        key(&mut app, KeyCode::Char('s'), KeyModifiers::NONE);
+        assert_eq!(app.rects, typed_rects);
+        assert!(app.status.contains("No recorded layout"));
+        key(&mut app, KeyCode::Char('b'), KeyModifiers::NONE);
+        assert_eq!(app.rects, live_rects);
+    }
+    #[test]
     fn cue_bookmarks_survive_demo_layout_changes_and_manual_shell_output() {
         let mut demo = Demo::builtin().unwrap();
         for pane in &mut demo.panes {
@@ -1221,8 +1498,9 @@ mod tests {
         }
         let mut app = App::new(demo, "demo.toml".into()).unwrap();
         app.resize(Rect::new(0, 0, 120, 32)).unwrap();
-        app.execute_selected().unwrap();
-        app.execute_selected().unwrap(); // Built-in cue changes the pane sizes.
+        for _ in 0..5 {
+            app.execute_selected().unwrap(); // Cue 5 makes the first layout change.
+        }
         let dir = tempfile::tempdir().unwrap();
         for index in 0..app.panes.len() {
             app.active = index;
@@ -1362,7 +1640,7 @@ mod tests {
         assert_eq!(app.queue, 2);
         assert!(app.advance.is_none());
         key(&mut app, KeyCode::Char('s'), KeyModifiers::NONE);
-        assert!(app.status.contains("Restored 1/1"));
+        assert!(app.status.contains("Restored 2/2"));
         key(&mut app, KeyCode::Char('b'), KeyModifiers::NONE);
         assert!(
             app.panes
@@ -1441,7 +1719,49 @@ mod tests {
         assert!(app.cues.focused);
         assert_eq!(app.pane_preview("service").1, 1);
         assert_eq!(app.pane_preview("observer").1, 1);
-        assert_eq!(expected, vec![36, 35, 35]);
+        assert_eq!(expected, vec![44, 37, 38]);
+        // Exercise the actual guided tour's bookmark instructions after all of
+        // its layout changes and shell output, not just synthetic layouts.
+        let live_rects = app.rects.clone();
+        for cue in [7, 4, 2, 10, 7] {
+            app.cues.select(cue, count);
+            key(&mut app, KeyCode::Char('s'), KeyModifiers::NONE);
+            let pane_count = match cue {
+                7 => 1,
+                4 => 2,
+                _ => 3,
+            };
+            assert!(
+                app.status
+                    .contains(&format!("Restored {pane_count}/{pane_count}")),
+                "cue {}: {}",
+                cue + 1,
+                app.status
+            );
+            assert_eq!(app.rects.iter().filter(|r| r.width > 0).count(), pane_count);
+            if cue == 7 {
+                terminal.draw(|frame| app.draw(frame)).unwrap();
+                let cells: String = terminal
+                    .backend()
+                    .buffer()
+                    .content
+                    .iter()
+                    .map(|cell| cell.symbol())
+                    .collect();
+                assert!(
+                    cells.contains("record 001"),
+                    "cue 8 must show its original output"
+                );
+            }
+            assert_eq!((app.queue, app.command), (count, 0));
+        }
+        key(&mut app, KeyCode::Char('b'), KeyModifiers::NONE);
+        assert_eq!(app.rects, live_rects);
+        assert!(
+            app.panes
+                .iter()
+                .all(|pane| pane.term.grid().display_offset() == 0)
+        );
     }
     #[test]
     fn cue_layouts_apply_on_dispatch_and_type_without_overwriting_global_layout() {

@@ -30,7 +30,8 @@ Options:
             (enabled by default)
 
       --demo
-          Load the built-in six-cue demo with three panes in nested columns and rows
+          Load the built-in twelve-cue guided tour of commands, layouts, and pane
+          controls
 
       --debug-keys
           Show the last key event and editor mode for shortcut troubleshooting
@@ -63,9 +64,9 @@ Options:
           verify shell paths, working directories, or command syntax.
 
       --init <PATH>
-          Write the built-in six-cue demo using /bin/sh and exit. The destination must
-          not exist and its parent directory must already exist. Cannot be combined with
-          --config or --check.
+          Write the built-in twelve-cue demo using /bin/sh and exit. The destination
+          must not exist and its parent directory must already exist. Cannot be combined
+          with --config or --check.
 
       --add-to-path [<SHELL>]
           Add the running binary's directory to PATH for bash, zsh, or both (default:
@@ -94,7 +95,7 @@ Options:
 
 EXAMPLES:
   nysos                              Start two shells with an empty cue list
-  nysos --demo                       Load the built-in six-cue demo
+  nysos --demo                       Load the built-in twelve-cue demo
   nysos --demo --disable-feature line-numbers  Disable line gutters if needed
   nysos --add-to-path                 Add this binary directory to Bash/Zsh PATH
   nysos --install-completions         Install Bash and Zsh completions
@@ -116,7 +117,8 @@ INTERACTIVE CONTROLS:
   Press p in the cue list to preview each pane’s next command or key/clear action; Esc
   closes.
   Press t to type commands without Enter; key/clear actions are sent immediately.
-  In Cues: s restores execution bookmarks, b scrolls all panes to bottom.
+  In Cues: s restores recorded layouts and bookmarks; b restores the live layout and
+  bottom.
   Space pauses/resumes an armed cue timer; browsing cancels it.
   Cue commands are sent in order without waiting for completion.
   Alt-Left/Right rotates focus; Ghostty mappings also accept Alt-B/F. Click to focus;

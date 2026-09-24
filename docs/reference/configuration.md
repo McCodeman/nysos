@@ -5,7 +5,7 @@
 
 A demo is a UTF-8 TOML file selected with `nysos --config PATH` or loaded through
 the modal. Plain `nysos` starts two interactive panes with no cues; `nysos --demo`
-explicitly loads the built-in six-cue example. There is no automatic discovery of `demo.toml`. Unknown fields and
+explicitly loads the built-in twelve-cue example. There is no automatic discovery of `demo.toml`. Unknown fields and
 invalid enum values are rejected. All paths resolve relative to nysos's launch
 directory, not the configuration file's directory; `~` and environment variables
 inside configured paths are not expanded.
@@ -102,11 +102,13 @@ is invalid. No sample commands are inserted into files that omit `queues`.
 
 The omitted `panes` array creates `presenter` (ocean) and `observer` (ember),
 each with weight 1 and the normal shell/args/cwd defaults.
-`nysos --demo` explicitly loads the six-cue pane transitions example, using
+`nysos --demo` explicitly loads the twelve-cue pane transitions example, using
 `service`, `observer`, and `notes` panes with `/bin/sh`. Service fills the left
-column; Observer and Notes are stacked in the right column. It demonstrates
-independent pane updates, updates to all three panes, title-only overrides, and
-theme-only overrides.
+column; Observer and Notes are initially stacked in the right column. It runs
+portable, bounded commands without network access, changes layouts, hides and
+restores live panes, and ends with a practice checklist for bookmarks and editing.
+Only cues 5, 8, and 10 change layouts; the other nine cues inherit their arrangement.
+Every cue is manually advanced; wait for shell prompts before continuing.
 `nysos --init demo.toml` exports this example; it refuses to overwrite a file.
 
 For a purely interactive single-pane demo:
@@ -227,8 +229,9 @@ TOML fields after `[layout]` belong to it; put other top-level settings before i
 | Split | `direction` | Required string | `"columns"` for left-to-right children; `"rows"` for top-to-bottom children. `"grid"` is only a preset, not a split direction. |
 | Split | `children` | Required array | Between 2 and 16 child nodes, each another pane reference or split. |
 
-Every configured pane must appear exactly once. Unknown, duplicate, and missing
-IDs are rejected. Pane nodes cannot also have `direction` or `children`; split
+Every configured pane must appear exactly once in the top-level layout.
+Cue layouts may omit panes to hide them; unknown and duplicate IDs are rejected
+in both. Pane nodes cannot also have `direction` or `children`; split
 nodes cannot have `pane`. Unknown fields are rejected. Maximum nesting depth is
 16 edges below the root. A single-pane tree can be `layout = { pane = "scratch" }`.
 
@@ -440,6 +443,12 @@ there is no implicit reset on each cue. Full-demo apply/reload restores the
 global layout. To restore a specific arrangement during playback, explicitly
 repeat that layout in a later cue. Replaying a cue reapplies its override.
 
+Cue trees may show a subset of configured panes, including a single pane with
+`layout = { pane = "service" }`. Omitted panes stay alive at their last terminal
+size and continue collecting output and scrollback. Later layouts can reveal
+them without restarting their shells. Focus navigation skips hidden panes.
+Preset layouts always include all configured panes.
+
 Resizing or cycling the layout while a cue override is active edits that cue's
 layout in memory; without an override, it edits the global layout. Save the full
 demo to persist either. Node weights provide per-cue sizing; pane-table weights
@@ -521,14 +530,24 @@ cursor position. It sends no command, keystroke, or signal to the process;
 it does not reset shell state or erase a partially typed line. A running program
 can redraw afterward. Alternate-screen programs do not provide normal history.
 
-Before dispatch, nysos records each target pane's execution line. Cue-list `s`
-returns those panes to the most recent recorded start of the selected cue;
-`b` returns **all** panes to the live bottom. Recording also happens with `t`.
+Before dispatch, nysos records the cue's effective layout and the execution lines
+of visible panes and action targets. Cue-list `s` restores that layout and returns
+those panes to the most recent recorded start of the selected cue. Recording also
+happens with `t`, including when a cue inherits its layout from an earlier cue.
+You can browse recorded cues backward or forward without overwriting the live
+layout or changing playback progress. `b` restores the current live layout,
+including any manual resizing, and returns **all** panes to the live bottom.
+Dispatching or typing a cue also leaves the historical view first, so cues without
+an override inherit the live layout. Resizing/cycling a historical view changes
+only that temporary view; it does not change saved snapshots or the live demo.
+Unexecuted cues have no snapshot and leave the view unchanged.
 Bookmarks survive pane resizing, layout changes, gutter toggles, and text reflow.
 They are in-memory and expire on alternate-screen transitions, history deletion, pane replacement, or configuration edits. They
 also expire when their lines are evicted from the terminal’s 10,000-line history.
-Recent bookmarks continue working when history is full. Missing bookmarks leave panes unchanged and
-are reported in the status line. A line still on the live screen may not yet be
+Recent bookmarks continue working when history is full. Missing bookmarks do not
+restore a scroll position and are reported in the status line; the recorded layout
+can still be restored. Layout snapshots expire on configuration edits, including
+adding an ad hoc pane. A line still on the live screen may not yet be
 scrollable to the top. These controls do not undo commands or rewind processes.
 
 See [`examples/key-playback.toml`](https://github.com/McCodeman/nysos/blob/main/examples/key-playback.toml)

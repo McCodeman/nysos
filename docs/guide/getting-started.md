@@ -4,7 +4,7 @@
 # Getting started
 
 Install nysos, open the included three-pane demo, then rehearse previewing,
-executing, and editing its six cues. You do not need the Alacritty application.
+executing, and editing its twelve cues. You do not need the Alacritty application.
 
 ## Install
 
@@ -73,20 +73,33 @@ second key. Use Control, not Command, on macOS. Ctrl-G avoids tmux's Ctrl-B pref
 
 1. The cue list has focus when nysos starts. **Up/Down** selects a cue.
    Use **Ctrl-G, 0** to return to the cue list after working in a shell.
-2. Select **Introduce all three shells** and press **p**. Each pane shows an
+2. Select **Welcome aboard** and press **p**. Each pane shows an
    overlay containing its next command. Nothing has executed.
 3. Press **Esc** to close the overlays and restore the shell panes.
 4. Press **Enter** while the cue list is focused. All three commands are sent,
-   titles/themes change, and selection advances to **Service only**.
-5. Wait for the shell prompts. Press **p**, **Esc**, then **Enter** again. This
-   cue widens the Service column and runs only its command.
-6. Execute **Observer only** next. Its cue layout gives Observer more height
-   above Notes. Other shell sessions remain intact.
+   titles/themes change, and selection advances to **Meet this machine**.
+5. Wait for the shell prompts. Press **p**, **Esc**, then **Enter** again.
+   **Meet this machine** runs identity commands in Service only. All three panes
+   stay in place, and the other two keep their contents.
+6. **Files and processes** runs `ls` in Service and `ps` in Observer while Notes
+   keeps its guide. **Build a pipeline** runs only in Service. These first four
+   cues all use the initial layout.
+7. **Focus the workbench** (cue 5) makes the first layout change: Service beside
+   Notes, with Observer hidden and still running. **Terminal styles** updates
+   Service only; **Watch a short job** sends commands to both visible panes.
+   All three cues keep this two-pane arrangement.
+8. **Fill the workbench** (cue 8) makes the second layout change, showing only
+   Service and printing 100 records. **A command to customize** keeps this
+   single-pane layout and prints a short greeting.
+9. **Welcome back, shells** (cue 10) makes the final layout change, restoring the
+   original arrangement and confirming that the shells kept their variables.
+   **Leave a trail** and **Your turn** keep that layout, send commands to all
+   three panes, and finish with the practice checklist. Try bookmarks before editing.
 
 Enter sends the selected cue's remaining commands without waiting for them to
 finish. To step one command at a time instead, use **Ctrl-G, n**. **Ctrl-G, s**
 skips the next command. Skipping and previewing do not change titles, themes,
-or cue layouts. The final cue restores balanced columns/rows. Pressing Enter
+or cue layouts. The final cue inherits balanced columns/rows from cue 10. Pressing Enter
 again on the final cue executes it again; replay is intentional and unlimited.
 
 ## Move between panes and work interactively
@@ -102,7 +115,7 @@ focus; use the prefix shortcuts if your terminal intercepts those keys.
 
 ## Edit a cue before sending it
 
-1. Return to the cue list and select **Title only** with **Up/Down**.
+1. Return to the cue list and select **A command to customize** with **Up/Down**.
 2. Press **e**. This edits one cue's TOML, including its name, description,
    commands, optional title/theme overrides, and optional layout.
 3. Change the text inside a quoted `printf` command, preserving valid TOML.
@@ -139,8 +152,8 @@ in the full editor. Adding one updates global and cue layout trees to include it
 
 1. Press **Ctrl-G, o**, or **o** in the cue list, to edit the **whole demo**.
 2. Change `title`, edit the global `[layout]`, add/reorder `[[queues]]`, or give
-   an individual cue its own `layout` tree and weights. Every tree must contain
-   every pane ID exactly once.
+   an individual cue its own `layout` tree and weights. The initial tree must
+   contain every pane ID exactly once; cue trees may omit panes to hide them.
 3. Press **Ctrl-S** or **F3**, enter a path such as `my-demo.toml`, then Enter.
    This saves and applies the demo, resetting cue progress while retaining
    matching shell sessions. Saving does not execute cues.
@@ -169,12 +182,24 @@ in-app help; `nysos --help` and `man nysos` describe command-line usage.
 
 ## Revisit output and try timed key actions
 
-After executing a cue, select it again and press **s** to revisit its starting
-output in the target panes. Press **b** to return every pane to live output.
+Finish the tour before trying this, so every layout has a recorded bookmark.
+In Cues, select **Fill the workbench** (cue 8) and press **s**: its single-pane
+layout and starting output return. Select **Focus the workbench** (cue 5), then
+**s** for two panes; select **Files and processes** (cue 3), then **s** for the
+initial three-pane arrangement. Select **Leave a trail** (cue 11), then **s** to
+move forward again.
+Press **b** to restore your current live layout and return every pane to bottom.
+Manual live resizing is preserved while you browse. These controls never replay
+commands or rewind processes. Try editing afterward: configuration edits reset
+bookmarks and layout snapshots.
 Bookmarks survive layout changes, resizing, and reflow while their output remains
 in terminal history. Replacing panes or discarding their history invalidates them.
 
-The built-in demo remains manually driven. A source checkout also includes:
+The built-in demo remains manually driven, offline, and finite. It uses `/bin/sh`,
+common macOS/Linux utilities, and POSIX text tools; `tput` styling has a plain-text
+fallback. The printed hints assume the default Ctrl-G prefix. If you override
+`--prefix`, use your chosen prefix instead. Mouse hints require mouse reporting;
+keyboard alternatives work with `--no-mouse`. A source checkout also includes:
 
 ```sh
 nysos --config examples/key-playback.toml

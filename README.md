@@ -29,8 +29,9 @@ the agent-readable documentation.
 ## Quick start
 
 Plain `nysos` opens two interactive shells with an empty cue list. Use
-`nysos --demo` to load the built-in six-cue example of changing pane titles and
-themes across three panes: Service on the left, Observer above Notes on the right.
+`nysos --demo` to load a twelve-cue guided tour with portable commands, terminal styling,
+and changing layouts. It starts with Service on the left and Observer above Notes
+on the right; later cues hide and restore panes while their shells stay alive.
 `nysos --init demo.toml` exports that example for editing.
 
 Install with Homebrew on macOS or Linux:
@@ -148,15 +149,19 @@ commands = [
 
 ## Documentation
 
-Try the [pane transitions demo](examples/pane-transitions.toml) for six cues that
-change titles and themes independently in three live shells with nested rows and columns:
+Try the [pane transitions demo](examples/pane-transitions.toml) for a twelve-cue guided tour of
+portable commands, changing layouts, and three independent live shells:
 
 ```sh
 nysos --config examples/pane-transitions.toml
 ```
 
-It includes updates to one pane, both panes, just a title, and just a theme.
-Press Enter in the cue list to run each cue; omitted panes keep their state.
+Run identity commands, inspect files/processes, compose text pipelines, and watch
+a short progress bar. Only three cues change layouts; the others run commands
+in one, two, or three panes while preserving their arrangement. Everything
+finishes on its own and works offline. Press Enter in the cue list and wait for
+prompts before continuing. The final cue teaches layout-aware scrollback, return
+to live output, preview, typing, editing, help, and saving your own demo.
 
 - [Getting started](docs/guide/getting-started.md)
 - [PATH and Bash/Zsh completions](docs/guide/shell-setup.md)

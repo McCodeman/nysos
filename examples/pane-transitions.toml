@@ -1,90 +1,136 @@
 # SPDX-FileCopyrightText: Copyright 2026 Marshall Cody McCain (mccodeman@proton.me)
 # SPDX-License-Identifier: Apache-2.0
 
-# Run: nysos --config examples/pane-transitions.toml
-# Enter in the cue list executes the selected cue. Prefix, n steps one command.
-# Each command targets a stable pane ID and may change that pane's title/scheme.
-# Omitted panes keep their current appearance and shell state.
+# Built-in guided tour: nysos --demo
+# Also run with: nysos --config examples/pane-transitions.toml
+# Commands use /bin/sh and common macOS/Linux tools. No network or extra packages.
+# All output is bounded. Wait for shell prompts before running the next cue.
+# Ctrl-G hints assume the default prefix; substitute your --prefix if overridden.
+# Only cues 5, 8, and 10 change layout; the others inherit it.
+# Only the last cue teaches bookmarks, after every layout has been recorded.
 features = ["line-numbers"]
 line_numbers = false
-title = "Independent pane titles and themes"
+title = "nysos · a hands-on terminal tour"
 header = true
 cue_list = true
 cue_width = 30
-# Service fills the left column; Observer and Notes share the right column.
-[layout]
-direction = "columns"
-children = [
-  { pane = "service" },
-  { direction = "rows", children = [{ pane = "observer" }, { pane = "notes" }] },
-]
+layout = { direction = "columns", children = [{ pane = "service" }, { direction = "rows", children = [{ pane = "observer" }, { pane = "notes" }] }] }
 
 [[panes]]
 id = "service"
-title = "Service · ready"
+title = "Service · workbench"
 shell = "/bin/sh"
 scheme = "ocean"
 weight = 1
 
 [[panes]]
 id = "observer"
-title = "Observer · ready"
-shell = "/bin/sh"
-scheme = "mono"
-weight = 1
-
-[[panes]]
-id = "notes"
-title = "Notes · ready"
+title = "Observer · second shell"
 shell = "/bin/sh"
 scheme = "forest"
 weight = 1
 
+[[panes]]
+id = "notes"
+title = "Notes · your guide"
+shell = "/bin/sh"
+scheme = "mono"
+weight = 1
+
 [[queues]]
-name = "Introduce all three shells"
-description = "All three panes get new titles, themes, and commands. Variables persist in their independent shells."
+name = "Welcome aboard"
+description = "Three independent shells. Enter runs a cue; wait for prompts before continuing. Preview with p, then Esc. Nothing starts automatically."
 commands = [
-  { pane = "service", title = "Service · setup", scheme = "forest", command = "DEMO_SERVICE=nysos; export DEMO_SERVICE; printf 'Service: %s\\n' \"$DEMO_SERVICE\"; pwd" },
-  { pane = "observer", title = "Observer · environment", scheme = "ocean", command = "DEMO_ROLE=observer; export DEMO_ROLE; printf 'Role: %s\\n' \"$DEMO_ROLE\"; uname -s" },
-  { pane = "notes", title = "Notes · demo guide", scheme = "ocean", command = "printf 'Service on the left; Observer above Notes on the right.\\n'" },
+  { pane = "service", title = "Service · workbench", scheme = "ocean", command = "DEMO_SERVICE=nysos; printf 'Service: %s\\n' \"$DEMO_SERVICE\"; printf '%s\\n' 'WELCOME TO NYSOS' 'Real shells. A guided terminal tour.' 'Enter runs the selected cue.' 'Wait for prompts before continuing.'; pwd" },
+  { pane = "observer", title = "Observer · second shell", scheme = "forest", command = "DEMO_ROLE=observer; printf 'Observer: %s\\n' \"$DEMO_ROLE\"; printf '%s\\n' 'This shell has its own state.' 'Watch it disappear and return.'; uname -s" },
+  { pane = "notes", title = "Notes · your guide", scheme = "mono", command = "printf '%s\\n' 'TOUR CONTROLS' 'p: preview; Esc: close.' 'Enter: run; wait for prompts.' 'Click a pane to focus it.' 'Drag borders to resize panes.' 'Wheel: browse; Shift-wheel: force.' 'Ctrl-G, 0: focus Cues.' 'Ctrl-G, ?: help; Esc: close.'" },
 ]
 
 [[queues]]
-name = "Service only"
-description = "Widen the service column and update its title/theme. Observer and Notes retain their titles, themes, and shell state."
-layout = { direction = "columns", children = [{ pane = "service", weight = 2 }, { direction = "rows", children = [{ pane = "observer", weight = 1 }, { pane = "notes", weight = 1 }] }] }
+name = "Meet this machine"
+description = "Run identity commands in Service only. Observer and Notes stay visible and untouched; the layout stays the same."
 commands = [
-  { pane = "service", title = "Service · inspecting", scheme = "ember", command = "printf 'Inspecting %s in %s\\n' \"$DEMO_SERVICE\" \"$PWD\"; ls -a" },
+  { pane = "service", title = "Service · identity", scheme = "ember", command = "printf '%s\\n' '== WHERE AND WHO =='; pwd; whoami; id; hostname; uname -a; date; printf \"Shell PID: %s\\n\" \"$$\"" },
 ]
 
 [[queues]]
-name = "Observer only"
-description = "Give Observer more height in the right column and update its title/theme. The original shell is still running."
-layout = { direction = "columns", children = [{ pane = "service", weight = 1 }, { direction = "rows", children = [{ pane = "observer", weight = 2 }, { pane = "notes", weight = 1 }] }] }
+name = "Files and processes"
+description = "Run bounded file and process listings in two panes. Notes keeps its guide, and all pane positions stay the same."
 commands = [
-  { pane = "observer", title = "Observer · healthy", scheme = "forest", command = "printf 'Role still set: %s\\nSimulated health check: OK\\n' \"$DEMO_ROLE\"; date" },
+  { pane = "service", title = "Service · files", scheme = "ocean", command = "printf '%s\\n' '== FILES: FIRST 10 LINES =='; ls -la /bin | head -n 10" },
+  { pane = "observer", title = "Observer · processes", scheme = "forest", command = "printf '%s\\n' '== PROCESSES: FIRST 10 LINES =='; ps -e | head -n 10" },
 ]
 
 [[queues]]
-name = "Title only"
-description = "Change the service title and execute a command. Omitting scheme retains its ember theme."
+name = "Build a pipeline"
+description = "Run a text pipeline in Service only. Compose printf, sort, uniq, tr, and awk while the other two panes keep their contents."
 commands = [
-  { pane = "service", title = "Service · shell state", command = "printf 'Same service shell: %s\\n' \"$DEMO_SERVICE\"; printf 'Working directory: '; pwd" },
+  { pane = "service", title = "Service · pipelines", scheme = "forest", command = "printf '%s\\n' '== COUNT WORDS =='; printf 'banana\\napple\\ncherry\\napple\\n' | sort | uniq -c; printf '%s\\n' '== TRANSFORM TEXT =='; printf 'make this loud\\n' | tr '[:lower:]' '[:upper:]'; printf 'alpha 3\\nbeta 7\\n' | awk '{total += $2} END {printf \"total: %d\\n\", total}'" },
 ]
 
 [[queues]]
-name = "Theme only"
-description = "Change only the Notes theme and execute a command. Its demo guide title remains."
+name = "Focus the workbench"
+description = "First layout change: hide Observer and keep Service beside Notes. These same two panes remain visible for the next three cues."
+layout = { direction = "columns", children = [{ pane = "service", weight = 2 }, { pane = "notes" }] }
 commands = [
-  { pane = "notes", scheme = "ember", command = "printf 'Drag borders to resize; Ctrl-G then < or > adjusts width, - or + adjusts height.\\n'" },
+  { pane = "service", title = "Service · focused workbench", command = "printf 'Same service: %s\\n' \"$DEMO_SERVICE\"; pwd; stty size" },
+  { pane = "notes", command = "printf '%s\\n' 'TWO PANES FOR A WHILE' 'Observer stays alive, hidden.' 'Its state and output remain.' 'Click panes; drag borders.' 'Ctrl-G, < / >: width.' 'Ctrl-G, - / +: height.' 'Next: styles, then a short job.'" },
 ]
 
 [[queues]]
-name = "Finish together"
-description = "All three panes receive distinct final titles, themes, and commands. Their stable IDs remain unchanged."
-layout = { direction = "columns", children = [{ pane = "service", weight = 1 }, { direction = "rows", children = [{ pane = "observer", weight = 1 }, { pane = "notes", weight = 1 }] }] }
+name = "Terminal styles"
+description = "Keep the two-pane layout. Service shows terminal styling and sample graphics; Notes remains untouched."
 commands = [
-  { pane = "service", title = "Service · complete", scheme = "ocean", command = "printf 'Finished demonstration for %s\\n' \"$DEMO_SERVICE\"" },
-  { pane = "observer", title = "Observer · complete", scheme = "ember", command = "printf 'Finished observation as %s\\n' \"$DEMO_ROLE\"" },
-  { pane = "notes", title = "Notes · complete", scheme = "forest", command = "printf 'Demo complete. Replay any cue with Enter.\\n'" },
+  { pane = "service", title = "Service · terminal styles", scheme = "ember", command = "printf 'Same service: %s\\n' \"$DEMO_SERVICE\"; if command -v tput >/dev/null 2>&1 && tput bold 2>/dev/null; then printf 'BOLD '; tput sgr0; tput smul 2>/dev/null; printf 'UNDERLINE'; tput sgr0; printf '\\n'; if tput setaf 2 2>/dev/null; then printf 'green OK'; tput sgr0; printf '\\n'; fi; else printf 'Plain terminal: styling unavailable\\n'; fi; printf 'CPU demo [########....]\\nMEM demo [#####.......]\\n'" },
+]
+
+[[queues]]
+name = "Watch a short job"
+description = "Keep the same two panes. A three-second progress bar runs in Service while Notes explains interruption. Wait for done before continuing."
+commands = [
+  { pane = "service", title = "Service · live job", scheme = "forest", command = "printf 'Working ['; i=0; while [ \"$i\" -lt 3 ]; do printf '####'; sleep 1; i=$((i + 1)); done; printf '] done\\n'; true; printf 'true exit: %s\\n' \"$?\"; false; printf 'false exit: %s\\n' \"$?\"" },
+  { pane = "notes", command = "printf '%s\\n' 'LIVE, NOT A RECORDING' 'This job finishes by itself.' 'To interrupt a running job:' 'Ctrl-G, 1 then Ctrl-C.' 'Ctrl-G, 0 returns to Cues.' 'Wait for done, then continue.'" },
+]
+
+[[queues]]
+name = "Fill the workbench"
+description = "Second layout change: give Service the full work area and print 100 numbered records. Both hidden shells stay alive. The next cue keeps this layout."
+layout = { pane = "service" }
+commands = [
+  { pane = "service", title = "Service · full screen", scheme = "ocean", command = "awk 'BEGIN {for (i=1; i<=100; i++) printf \"record %03d | portable terminal output\\n\", i}'; printf '%s\\n' '100 records, then a prompt. Both other shells are still alive.' 'Continue the tour. The last cue explains how to revisit this output.'" },
+]
+
+[[queues]]
+name = "A command to customize"
+description = "Keep the single-pane layout. This short command is easy to preview, type, or edit after completing the tour."
+commands = [
+  { pane = "service", title = "Service · try your own words", command = "printf 'Hello from %s!\\n' \"$(uname -s)\"" },
+]
+
+[[queues]]
+name = "Welcome back, shells"
+description = "Final layout change: restore the initial three-pane arrangement. Confirm that the original shells kept their variables. Keep this layout through the finish."
+layout = { direction = "columns", children = [{ pane = "service" }, { direction = "rows", children = [{ pane = "observer" }, { pane = "notes" }] }] }
+commands = [
+  { pane = "service", title = "Service · same session", scheme = "ocean", command = "printf 'Service survived: %s\\n' \"$DEMO_SERVICE\"; pwd; stty size" },
+  { pane = "observer", title = "Observer · still alive", scheme = "forest", command = "printf 'Role survived hiding: %s\\n' \"$DEMO_ROLE\"; printf '%s\\n' 'Same running shell; no restart.'; date; stty size" },
+  { pane = "notes", title = "Notes · your guide", scheme = "forest", command = "printf '%s\\n' 'ALL THREE SHELLS RETURN' 'Same IDs, same sessions.' 'This layout stays until the end.' 'Ctrl-G, # toggles line numbers.' 'Next: history, then practice.'" },
+]
+
+[[queues]]
+name = "Leave a trail"
+description = "Keep the three-pane layout and send a command to every shell. Add bounded history before the final practice checklist."
+commands = [
+  { pane = "service", title = "Service · history", scheme = "ocean", command = "awk 'BEGIN {for (i=1; i<=60; i++) printf \"service history %02d | ready\\n\", i}'; printf '%s\\n' 'Next cue: your practice checklist.'" },
+  { pane = "observer", title = "Observer · history", scheme = "ember", command = "awk 'BEGIN {for (i=1; i<=40; i++) printf \"observer history %02d | alive\\n\", i}'; printf '%s\\n' 'Next cue: type, preview, edit.'" },
+  { pane = "notes", title = "Notes · history", scheme = "forest", command = "awk 'BEGIN {for (i=1; i<=40; i++) printf \"notes history %02d | retained\\n\", i}'; printf '%s\\n' 'Next cue: help and config.'" },
+]
+
+[[queues]]
+name = "Your turn"
+description = "Tour complete. This cue inherits the previous layout. Try s on earlier cues in either direction, then b to restore this live arrangement. Edit only after practicing bookmarks."
+commands = [
+  { pane = "service", title = "Service · revisit layouts", scheme = "ocean", command = "printf '%s\\n' 'TRY LAYOUT-AWARE SCROLLBACK' 'In Cues, select 08; press s.' 'One pane and its output return.' 'Select 05; s: two panes.' 'Select 03; s: all three panes.' 'Select 11; s: forward again.' 'b: restore the live layout.' 'Try resizing, then s and b.' 'Edits reset bookmarks: try last.'" },
+  { pane = "observer", title = "Observer · practice", scheme = "ember", command = "printf '%s\\n' 'THEN TRY CUE 09' 'p, Esc: preview and close.' 't: type; edit words; Enter.' 'Ctrl-G, 0: return to Cues.' 'e: edit; F4: apply; Esc: cancel.' 'Enter from Cues sends it again.'" },
+  { pane = "notes", title = "Notes · keep exploring", scheme = "forest", command = "printf '%s\\n' 'HELP / YOUR OWN DEMO' 'Ctrl-G, ?: help; Esc: close.' 'o in Cues: edit entire demo.' 'F3: save as; F4: apply.' 'Export from a separate shell:' 'nysos --init my-demo.toml' 'nysos --config my-demo.toml' 'Ctrl-G, q: quit.'" },
 ]

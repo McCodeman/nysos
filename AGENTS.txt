@@ -20,7 +20,9 @@ From a source checkout with Nix installed:
     nysos --demo
 
 Plain nysos opens two shells with no prepared cues. Only --demo loads the built-in
-three-pane, six-cue example: Service left, Observer above Notes right. No project
+three-pane, twelve-cue guided tour: portable commands, changing layouts, hidden/live
+shells, and a final practice checklist. Initially Service is left, Observer above
+Notes right. All commands finish; wait for prompts before continuing. No project
 file is auto-discovered. Export, validate, and open an editable copy with:
 
     nysos --init demo.toml
@@ -109,7 +111,8 @@ Command strings must be nonempty single-line input, with no NUL, CR, or LF.
 
 Supported schemes: ocean, forest, ember, mono. Layouts accept columns/rows/grid
 presets or recursive direction/children groups and pane leaves with weights.
-Every pane must appear exactly once in a layout tree. A cue can override layout
+Every pane must appear exactly once in the initial layout tree. Cue trees may
+omit panes to hide them while retaining their live shells and output. A cue can override layout
 with the same schema; it applies on execution or typing, persists afterward,
 and does not apply during preview. Omitted pane styling retains its live value.
 
@@ -152,8 +155,10 @@ Top-level loop = true wraps the playlist. Neither starts playback on launch.
 Space in Cues pauses/resumes an armed timer; modals suspend it, browsing cancels
 it, and configuration edits cancel it. There is no process-completion detection.
 
-In Cues, s restores that cue's most recent execution-line bookmarks; b scrolls
-all panes to live bottom. Bookmarks survive layout changes and reflow. They expire on history deletion/eviction from
+In Cues, s restores that cue's recorded effective layout and most recent pane
+bookmarks; b restores the current live layout and scrolls all panes to bottom.
+Browsing recorded cues in either direction preserves the live layout and weights.
+Bookmarks survive layout changes and reflow. They expire on history deletion/eviction from
 10,000-line history, alternate-screen transitions, pane replacement, or config
 edits. See docs/reference/configuration.md for all rules and key combinations;
 examples/key-playback.toml demonstrates automatic looping with native actions.

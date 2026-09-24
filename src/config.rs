@@ -113,6 +113,18 @@ impl LayoutNode {
     }
 }
 impl Layout {
+    pub fn contains_pane(&self, id: &str) -> bool {
+        fn contains(node: &LayoutNode, id: &str) -> bool {
+            match node {
+                LayoutNode::Pane { pane, .. } => pane == id,
+                LayoutNode::Split { children, .. } => children.iter().any(|n| contains(n, id)),
+            }
+        }
+        match self {
+            Self::Preset(_) => true,
+            Self::Tree(root) => contains(root, id),
+        }
+    }
     pub fn validate(&self, ids: &HashSet<&str>) -> Result<()> {
         if let Self::Tree(root) = self {
             let mut seen = HashSet::new();
@@ -412,8 +424,9 @@ impl Demo {
 
 impl Queue {
     pub fn validate(&self, panes: &HashSet<&str>) -> Result<()> {
-        if let Some(layout) = &self.layout {
-            layout.validate(panes)?;
+        if let Some(Layout::Tree(root)) = &self.layout {
+            // A cue may hide configured panes, but cannot duplicate or invent IDs.
+            root.validate(panes, &mut HashSet::new(), 0)?;
         }
         if self.name.trim().is_empty() || self.commands.is_empty() {
             bail!("Each queue needs a name and at least one command");
@@ -574,6 +587,43 @@ mod tests {
         assert!(demo.validate().is_err());
     }
     #[test]
+    fn cue_layouts_can_hide_panes_but_still_validate_references() {
+        let mut demo = test_demo();
+        demo.queues[0].layout = Some(Layout::Tree(LayoutNode::Pane {
+            pane: "presenter".into(),
+            weight: 1,
+        }));
+        demo.validate().unwrap();
+        let saved = toml::to_string_pretty(&demo).unwrap();
+        assert_eq!(
+            Demo::parse(&saved).unwrap().queues[0].layout,
+            demo.queues[0].layout
+        );
+        for tree in [
+            LayoutNode::Pane {
+                pane: "unknown".into(),
+                weight: 1,
+            },
+            LayoutNode::Split {
+                direction: Axis::Rows,
+                weight: 1,
+                children: vec![
+                    LayoutNode::Pane {
+                        pane: "presenter".into(),
+                        weight: 1,
+                    },
+                    LayoutNode::Pane {
+                        pane: "presenter".into(),
+                        weight: 1,
+                    },
+                ],
+            },
+        ] {
+            demo.queues[0].layout = Some(Layout::Tree(tree));
+            assert!(demo.validate().is_err());
+        }
+    }
+    #[test]
     fn nested_layout_round_trip_and_validation() {
         let demo = Demo::parse(include_str!("../examples/nested-layout.toml")).unwrap();
         let saved = toml::to_string_pretty(&demo).unwrap();
@@ -628,7 +678,7 @@ mod tests {
                 .is_empty()
         );
         let demo = Demo::builtin().unwrap();
-        assert_eq!(demo.queues.len(), 6);
+        assert_eq!(demo.queues.len(), 12);
         assert_eq!(demo.panes.len(), 3);
         let geometry = crate::layout::panes(
             ratatui::layout::Rect::new(0, 0, 120, 40),
@@ -643,16 +693,43 @@ mod tests {
                 ratatui::layout::Rect::new(60, 20, 60, 20),
             ]
         );
-        assert_eq!(demo.queues[1].commands.len(), 1);
-        assert_eq!(demo.queues[2].commands.len(), 1);
-        assert_ne!(
-            demo.queues[1].commands[0].pane,
-            demo.queues[2].commands[0].pane
+        // Layout changes are deliberate section boundaries, not every cue.
+        let changes: Vec<_> = demo
+            .queues
+            .iter()
+            .enumerate()
+            .filter_map(|(i, cue)| cue.layout.as_ref().map(|_| i + 1))
+            .collect();
+        assert_eq!(changes, vec![5, 8, 10]);
+        let targets: Vec<_> = demo.queues[..4]
+            .iter()
+            .map(|cue| cue.commands.len())
+            .collect();
+        assert_eq!(targets, vec![3, 1, 2, 1]);
+        assert!(
+            !demo.queues[4]
+                .layout
+                .as_ref()
+                .unwrap()
+                .contains_pane("observer")
         );
-        for index in [1, 2] {
-            assert!(demo.queues[index].commands[0].title.is_some());
-            assert!(demo.queues[index].commands[0].scheme.is_some());
-        }
+        assert!(
+            !demo.queues[7]
+                .layout
+                .as_ref()
+                .unwrap()
+                .contains_pane("notes")
+        );
+        assert!(
+            demo.queues[9]
+                .layout
+                .as_ref()
+                .unwrap()
+                .contains_pane("observer")
+        );
+        assert!(demo.queues[11].layout.is_none());
+        assert!(demo.queues.iter().all(|cue| cue.advance_after_ms.is_none()));
+        assert!(!demo.loop_cues);
     }
 
     #[test]

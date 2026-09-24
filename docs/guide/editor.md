@@ -122,8 +122,9 @@ without `--debug-keys` to hide the diagnostic line.
 ## Change pane titles and themes per cue
 
 Run `nysos --config examples/pane-transitions.toml` from the source checkout for
-a six-cue example. It updates each pane independently, then updates all three together;
-it also demonstrates title-only and theme-only overrides alongside new commands.
+a twelve-cue guided tour. It combines portable commands, layout changes, and pane
+titles/themes. Cue **A command to customize** is a short, single-target
+command to practice editing after completing the tour.
 
 In the cue editor (`e`), add `title` and/or `scheme` to a command:
 

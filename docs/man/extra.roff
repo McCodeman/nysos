@@ -7,8 +7,9 @@
 Start two interactive shells using SHELL, or /bin/sh, with an empty cue list.
 .TP
 .B nysos --demo
-Load the built-in six-cue demo: Service fills the left column; Observer and Notes
-are stacked in the right column. Cues change titles and themes independently.
+Load the built-in twelve-cue demo: Service fills the left column; Observer and Notes
+are stacked in the right column. Most cues run commands without rearranging
+panes. Only cues 5, 8, and 10 change layouts, hiding and restoring live shells.
 .TP
 .B nysos \-\-init demo.toml
 Create a starter file without overwriting an existing file.
@@ -175,7 +176,7 @@ for a five-pane example.
 .TP
 .B SHELL
 Default shell executable for panes that omit shell. The built-in and exported
-six-cue example explicitly uses /bin/sh.
+twelve-cue example explicitly uses /bin/sh.
 Falls back to /bin/sh when unavailable.
 .TP
 .B TERM, COLORTERM
@@ -279,12 +280,15 @@ playback automatically. A cue without a timer stops the automatic chain.
 Space in Cues pauses/resumes an armed timer. Modals suspend the countdown;
 browsing cues, restoring bookmarks, or applying configuration cancels it.
 .SH OUTPUT BOOKMARKS
-In Cues, s restores that cue's latest execution-line bookmarks in its target
-panes; b returns all panes to live bottom. These are not undo or replay controls.
+In Cues, s restores that cue's recorded effective layout and latest bookmarks
+in visible panes and action targets; b restores the current live layout and
+returns all panes to bottom. Browsing backward or forward preserves the live
+layout and weights. Cue layouts may hide panes; their shells keep running and
+collecting output. These are not undo or replay controls.
 Bookmarks survive resizing, layout changes, gutter toggles, and text reflow.
 They are in-memory and expire on history deletion or eviction from
 its 10000-line history, alternate-screen changes, pane replacement, or config edits.
-Unavailable bookmarks are reported without changing those panes' scroll positions.
+Unavailable bookmarks are reported; their recorded layout can still be restored.
 
 .SH FEATURE GATES AND LINE NUMBERS
 The line-numbers runtime gate defaults on, including in the built-in demo,

@@ -86,8 +86,8 @@ press **Ctrl-G, 0**. While focused:
 | Enter | Send all remaining actions in the selected cue |
 | `p` | Preview the selected cue’s command, keys/repeats, or clear action over each shell pane; Esc closes |
 | `t` | Type the next command per target pane without Enter, then focus the first target |
-| `s` | Restore the selected cue’s recorded execution positions in its target panes |
-| `b` | Return all panes to the live bottom |
+| `s` | Restore the selected cue’s recorded layout and pane bookmarks |
+| `b` | Restore the current live layout and return all panes to bottom |
 | Space | Pause/resume an armed automatic-advance timer |
 | `e` | Edit only the selected cue in the modal |
 | `o` | Open the entire demo to add cues, rename the demo, or load/save a file |
@@ -95,7 +95,8 @@ press **Ctrl-G, 0**. While focused:
 | Esc | Return to the last focused shell |
 
 The mouse wheel browses the list; clicking selects without executing. The `▶`
-marker identifies playback progress independently of your selection. The header
+marker identifies the next pending cue independently of your selection; its
+`[1/2]` counter means command 1 of 2 is next, not that command 1 has run. The header
 previews the selected cue while the list is focused. **Ctrl-G, c** toggles the
 list, giving its space back to shell panes when hidden. On launch, the visible
 cue list has focus. Set `cue_list = false` to start with it hidden and focus the

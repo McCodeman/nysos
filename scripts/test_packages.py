@@ -40,11 +40,11 @@ with tempfile.TemporaryDirectory(prefix='nysos-package-test-') as directory:
             ('fedora:42', f'dnf -y --disablerepo="*" install /packages/{name}.rpm && nysos --demo --check'),
         ]:
             output = subprocess.check_output([*base, '-v', f'{dist}:/packages:ro', image, 'sh', '-ec', command], text=True)
-            assert 'Valid: 3 panes, 6 queue items' in output, output
+            assert 'Valid: 3 panes, 12 queue items' in output, output
             print(f'PASS: {args.platform} installed with package manager in {image}')
         command = [*base, '-it', '-e', 'TERM=xterm-256color', '-v', f'{binary}:/usr/local/bin/nysos:ro', 'alpine:3.23', 'nysos', '--demo']
     else:
-        assert 'Valid: 3 panes, 6 queue items' in subprocess.check_output([str(binary), '--demo', '--check'], text=True)
+        assert 'Valid: 3 panes, 12 queue items' in subprocess.check_output([str(binary), '--demo', '--check'], text=True)
         command = [str(binary), '--demo']
     master, slave = pty.openpty()
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 36, 140, 0, 0))

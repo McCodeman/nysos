@@ -47,7 +47,7 @@ impl CueList {
     }
     pub fn draw(&self, frame: &mut Frame, queues: &[Queue], current: usize, command: usize) {
         let block = Block::bordered()
-            .title(" Cues ")
+            .title(" Cues · ▶ next ")
             .border_style(Style::default().fg(if self.focused {
                 Color::Cyan
             } else {

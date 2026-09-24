@@ -7,9 +7,9 @@ A demo can combine columns, rows, and nested groups. Each leaf identifies a
 pane by its stable `id`; commands keep targeting that ID when you rearrange it.
 The cue sidebar is separate from this layout and stays on the far left.
 
-The built-in demo (`nysos --demo`) has three shell panes: Service fills the left
+The built-in demo (`nysos --demo`) starts with three shell panes: Service fills the left
 column, with Observer above Notes in the right column. `nysos --init demo.toml`
-exports that layout and its six cues.
+exports that layout and its twelve cues.
 
 For a more deeply nested five-pane example, run from the repository root:
 
@@ -46,7 +46,8 @@ children = [
 ```
 
 Define all five IDs with `[[panes]]` tables. Every configured pane must appear
-exactly once in the tree. The [configuration reference](../reference/configuration.md#nested-layout-trees)
+exactly once in the initial tree. Cue trees may omit panes to hide them.
+The [configuration reference](../reference/configuration.md#nested-layout-trees)
 lists all fields and validation rules. Existing `layout = "columns"`, `"rows"`,
 and `"grid"` files continue to work.
 
@@ -59,8 +60,21 @@ A cue can override `layout` with the same tree schema and its own weights.
 It applies on execution or `t`, and persists until another cue override or a
 full-demo apply. Previewing/skipping does not apply it. Mouse and keyboard
 resizing change the active cue's tree when an override is active, otherwise the
-global layout. Saving persists both. The built-in demo demonstrates widening
-Service, giving Observer extra height, and returning to the original proportions.
+global layout. Saving persists both. The built-in demo changes layouts only at cues 5, 8, and 10: two visible panes,
+then one, then all three again. Several command cues inherit each arrangement,
+showing that a command can target one or several panes without moving them.
+
+A cue such as `layout = { pane = "service" }` shows only Service. Omitted panes
+keep their shells, terminal size, and scrollback, and continue collecting output.
+Focus navigation skips hidden panes. Later layouts can show them again.
+
+Each executed or typed cue records its effective layout, including inherited
+layouts and current weights. In Cues, **s** restores that layout and its pane
+bookmarks. You can browse recorded cues in either direction without changing
+playback progress or the current live layout. **b** restores the live layout,
+including manual resizing, and scrolls all panes to bottom. Resizing or cycling
+a historical view affects only that temporary view; saving still saves the live
+configuration. Dispatching or typing a cue returns to the live layout first.
 
 **Ctrl-G, a** adds an ad hoc pane at the right of a custom layout. A root column
 split gets another child with the average weight of its siblings; any other root
